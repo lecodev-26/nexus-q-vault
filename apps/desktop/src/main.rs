@@ -7,14 +7,107 @@ use nexusq_core::{
     storage::backup,
     vault::{Algorithm, KeyId, KeyStatus, Purpose, Session, Vault},
 };
-use std::sync::Mutex;
-use tauri::{AppHandle, State};
+use std::{
+    sync::{
+        Mutex,
+        atomic::{AtomicBool, Ordering},
+    },
+    thread,
+    time::{Duration, Instant},
+};
+use tauri::{AppHandle, Emitter, Manager, RunEvent, State};
 use tauri_plugin_dialog::{DialogExt, FilePath};
 use zeroize::Zeroizing;
 
-#[derive(Default)]
 struct AppState {
     session: Mutex<Option<Session>>,
+    last_activity: Mutex<Instant>,
+    idle_timeout: Mutex<Duration>,
+    watchdog_stop: AtomicBool,
+}
+impl Default for AppState {
+    fn default() -> Self {
+        Self {
+            session: Mutex::new(None),
+            last_activity: Mutex::new(Instant::now()),
+            idle_timeout: Mutex::new(Duration::from_secs(300)),
+            watchdog_stop: AtomicBool::new(false),
+        }
+    }
+}
+fn idle_timeout_from_seconds(seconds: u64) -> Result<Duration, String> {
+    if ![60, 300, 600, 900, 1800].contains(&seconds) {
+        return Err("El tiempo de inactividad seleccionado no es válido".into());
+    }
+    Ok(Duration::from_secs(seconds))
+}
+
+fn inactivity_elapsed(last_activity: Instant, now: Instant, timeout: Duration) -> bool {
+    !timeout.is_zero() && now.duration_since(last_activity) >= timeout
+}
+
+fn touch_activity(state: &AppState) -> Result<(), String> {
+    *state
+        .last_activity
+        .lock()
+        .map_err(|_| "No se pudo actualizar la actividad".to_string())? = Instant::now();
+    Ok(())
+}
+fn lock_session(state: &AppState) -> Result<bool, String> {
+    let mut guard = state
+        .session
+        .lock()
+        .map_err(|_| "El estado seguro de la aplicación no está disponible".to_string())?;
+    let Some(session) = guard.take() else {
+        return Ok(false);
+    };
+    session
+        .lock()
+        .map_err(|error| format!("No se pudo guardar y bloquear el vault: {error}"))?;
+    drop(guard);
+    Ok(true)
+}
+fn auto_lock_if_idle(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    let timeout = match state.idle_timeout.lock() {
+        Ok(value) => *value,
+        Err(_) => return,
+    };
+    let last_activity = match state.last_activity.lock() {
+        Ok(value) => *value,
+        Err(_) => return,
+    };
+    if !inactivity_elapsed(last_activity, Instant::now(), timeout) {
+        return;
+    }
+    let mut session = match state.session.lock() {
+        Ok(value) => value,
+        Err(_) => return,
+    };
+    let still_idle = state
+        .last_activity
+        .lock()
+        .map(|last| inactivity_elapsed(*last, Instant::now(), timeout))
+        .unwrap_or(false);
+    if !still_idle || session.is_none() {
+        return;
+    }
+    let Some(active) = session.take() else {
+        return;
+    };
+    let lock_result = active.lock();
+    drop(session);
+    match lock_result {
+        Ok(_) => {
+            let _ = app.emit("vault-auto-locked", "inactivity");
+        }
+        Err(error) => {
+            let _ = app.emit(
+                "vault-lock-failed",
+                format!("No se pudo guardar y bloquear automáticamente el vault: {error}"),
+            );
+        }
+    }
 }
 
 fn secret_bytes(value: String) -> Zeroizing<Vec<u8>> {
@@ -50,7 +143,27 @@ fn vault_status(state: State<'_, AppState>) -> Result<bool, String> {
         .map_err(|_| "El estado seguro de la aplicación no está disponible".to_string())?;
     Ok(guard.is_some())
 }
-
+#[tauri::command]
+fn record_activity(state: State<'_, AppState>) -> Result<(), String> {
+    let _session = state
+        .session
+        .lock()
+        .map_err(|_| "El estado seguro de la aplicación no está disponible".to_string())?;
+    touch_activity(&state)
+}
+#[tauri::command]
+fn set_idle_timeout(state: State<'_, AppState>, seconds: u64) -> Result<(), String> {
+    let timeout = idle_timeout_from_seconds(seconds)?;
+    let _session = state
+        .session
+        .lock()
+        .map_err(|_| "El estado seguro de la aplicación no está disponible".to_string())?;
+    *state
+        .idle_timeout
+        .lock()
+        .map_err(|_| "No se pudo guardar el tiempo de bloqueo".to_string())? = timeout;
+    touch_activity(&state)
+}
 #[tauri::command]
 fn create_vault(
     state: State<'_, AppState>,
@@ -90,6 +203,7 @@ fn create_vault(
         .unlock(password.as_slice())
         .map_err(|e| format!("No se pudo verificar el vault creado: {e}"))?;
     *guard = Some(session);
+    touch_activity(&state)?;
     Ok("Vault creado, verificado y desbloqueado".into())
 }
 
@@ -114,22 +228,17 @@ fn open_vault(
         .and_then(|vault| vault.unlock(password.as_slice()))
         .map_err(|e| format!("No se pudo desbloquear el vault: {e}"))?;
     *guard = Some(session);
+    touch_activity(&state)?;
     Ok("Vault desbloqueado".into())
 }
 
 #[tauri::command]
 fn lock_vault(state: State<'_, AppState>) -> Result<String, String> {
-    let mut guard = state
-        .session
-        .lock()
-        .map_err(|_| "El estado seguro de la aplicación no está disponible".to_string())?;
-    let session = guard
-        .take()
-        .ok_or_else(|| "No hay ningún vault desbloqueado".to_string())?;
-    session
-        .lock()
-        .map_err(|e| format!("No se pudo guardar y bloquear el vault: {e}"))?;
-    Ok("Vault guardado y bloqueado".into())
+    if lock_session(&state)? {
+        Ok("Vault guardado y bloqueado".into())
+    } else {
+        Err("No hay ningún vault desbloqueado".into())
+    }
 }
 
 #[tauri::command]
@@ -263,6 +372,7 @@ fn import_backup(
         .unlock(password.as_slice())
         .map_err(|e| format!("No se pudo verificar el vault restaurado: {e}"))?;
     *guard = Some(session);
+    touch_activity(&state)?;
     Ok("Backup restaurado en un nuevo vault y verificado".into())
 }
 
@@ -375,8 +485,27 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(AppState::default())
+        .setup(|app| {
+            let handle = app.handle().clone();
+            thread::spawn(move || {
+                loop {
+                    thread::sleep(Duration::from_secs(1));
+                    let should_stop = {
+                        let state = handle.state::<AppState>();
+                        state.watchdog_stop.load(Ordering::Relaxed)
+                    };
+                    if should_stop {
+                        break;
+                    }
+                    auto_lock_if_idle(&handle);
+                }
+            });
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             vault_status,
+            record_activity,
+            set_idle_timeout,
             create_vault,
             open_vault,
             lock_vault,
@@ -391,6 +520,69 @@ fn main() {
             pick_folder_path,
             open_project_repository
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running NEXUS-Q Vault");
+        .build(tauri::generate_context!())
+        .expect("error while building NEXUS-Q Vault")
+        .run(|app, event| match event {
+            RunEvent::ExitRequested { api, .. } => {
+                let state = app.state::<AppState>();
+                if let Err(error) = lock_session(&state) {
+                    let _ = app.emit("vault-lock-failed", error);
+                    api.prevent_exit();
+                }
+            }
+            RunEvent::Resumed => {
+                let state = app.state::<AppState>();
+                match lock_session(&state) {
+                    Ok(true) => {
+                        let _ = app.emit("vault-auto-locked", "system-resume");
+                    }
+                    Ok(false) => {}
+                    Err(error) => {
+                        let _ = app.emit("vault-lock-failed", error);
+                    }
+                }
+                let _ = touch_activity(&state);
+            }
+            RunEvent::Exit => app
+                .state::<AppState>()
+                .watchdog_stop
+                .store(true, Ordering::Relaxed),
+            _ => {}
+        });
+}
+
+#[cfg(test)]
+mod idle_lock_tests {
+    use super::{idle_timeout_from_seconds, inactivity_elapsed};
+    use std::time::{Duration, Instant};
+
+    #[test]
+    fn accepts_only_supported_idle_timeouts() {
+        for seconds in [60, 300, 600, 900, 1800] {
+            assert_eq!(
+                idle_timeout_from_seconds(seconds),
+                Ok(Duration::from_secs(seconds))
+            );
+        }
+        for seconds in [0, 30, 120, 3600] {
+            assert!(idle_timeout_from_seconds(seconds).is_err());
+        }
+    }
+
+    #[test]
+    fn inactivity_deadline_is_inclusive_and_disabled_for_zero() {
+        let now = Instant::now();
+        let last_activity = now - Duration::from_secs(300);
+        assert!(!inactivity_elapsed(
+            last_activity,
+            now,
+            Duration::from_secs(301)
+        ));
+        assert!(inactivity_elapsed(
+            last_activity,
+            now,
+            Duration::from_secs(300)
+        ));
+        assert!(!inactivity_elapsed(last_activity, now, Duration::ZERO));
+    }
 }

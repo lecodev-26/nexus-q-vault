@@ -26,6 +26,20 @@ function clearSecrets(form) {
   });
 }
 
+function clearAllSecrets() {
+  document.querySelectorAll(".secret-row").forEach((row) => {
+    const input = row.querySelector("input");
+    const toggle = row.querySelector("button");
+    if (!input || !toggle) return;
+    input.value = "";
+    input.type = "password";
+    input.setCustomValidity("");
+    toggle.textContent = preference("language", "en") === "es" ? "Mostrar" : "Show";
+    toggle.setAttribute("aria-pressed", "false");
+    toggle.setAttribute("aria-label", preference("language", "en") === "es" ? "Mostrar contraseña" : "Show password");
+  });
+}
+
 function bindSecretToggle(buttonId, inputId) {
   const button = $(buttonId);
   const input = $(inputId);
@@ -143,15 +157,7 @@ lockButton.addEventListener("click", async () => {
   } catch (error) {
     showMessage(String(error), true);
   } finally {
-    document.querySelectorAll(".secret-row").forEach((row) => {
-      const input = row.querySelector("input");
-      const toggle = row.querySelector("button");
-      input.value = "";
-      input.type = "password";
-      toggle.textContent = preference("language", "en") === "es" ? "Mostrar" : "Show";
-      toggle.setAttribute("aria-pressed", "false");
-      toggle.setAttribute("aria-label", preference("language", "en") === "es" ? "Mostrar contraseña" : "Show password");
-    });
+    clearAllSecrets();
     lockButton.textContent = originalLabel;
     await refreshStatus();
   }
@@ -162,6 +168,61 @@ refreshStatus();
 // Local preferences: language and profile never leave this device.
 const preference = (key, fallback = "") => { try { return localStorage.getItem(`nqv.${key}`) ?? fallback; } catch { return fallback; } };
 const storePreference = (key, value) => { try { localStorage.setItem(`nqv.${key}`, value); } catch { /* storage may be unavailable */ } };
+let lastActivitySent = 0;
+function reportActivity() {
+  const now = Date.now();
+  if (now - lastActivitySent < 10000) return;
+  lastActivitySent = now;
+  invoke("record_activity").catch(() => {});
+}
+["pointerdown", "pointermove", "keydown", "touchstart", "wheel"].forEach((eventName) => {
+  document.addEventListener(eventName, reportActivity, { passive: true });
+});
+document.addEventListener("visibilitychange", async () => {
+  if (document.hidden) {
+    try {
+      await invoke("lock_vault");
+      clearAllSecrets();
+      await refreshStatus();
+    } catch (error) {
+      if (!String(error).includes("No hay ningún vault desbloqueado")) showMessage(String(error), true);
+    }
+  } else {
+    await refreshStatus();
+  }
+});
+const idleTimeoutSelect = $("idle-timeout");
+async function initializeIdleTimeout() {
+  if (!idleTimeoutSelect) return;
+  try {
+    const stored = Number(preference("idleTimeout", "300"));
+    const allowed = [60, 300, 600, 900, 1800];
+    const seconds = allowed.includes(stored) ? stored : 300;
+    await invoke("set_idle_timeout", { seconds });
+    idleTimeoutSelect.value = String(seconds);
+  } catch (error) { showMessage(String(error), true); }
+}
+idleTimeoutSelect?.addEventListener("change", async () => {
+  const seconds = Number(idleTimeoutSelect.value);
+  idleTimeoutSelect.disabled = true;
+  try {
+    await invoke("set_idle_timeout", { seconds });
+    storePreference("idleTimeout", String(seconds));
+    showMessage(preference("language", "en") === "es" ? "Bloqueo automático actualizado." : "Automatic lock updated.");
+  } catch (error) { showMessage(String(error), true); }
+  finally { idleTimeoutSelect.disabled = false; }
+});
+window.__TAURI__.event.listen("vault-auto-locked", async () => {
+  clearAllSecrets();
+  await refreshStatus();
+  showMessage(preference("language", "en") === "es" ? "El vault se bloqueó automáticamente por seguridad." : "The vault was automatically locked for security.");
+}).catch((error) => showMessage(String(error), true));
+window.__TAURI__.event.listen("vault-lock-failed", (event) => {
+  showMessage(String(event.payload), true);
+  refreshStatus();
+}).catch((error) => showMessage(String(error), true));
+initializeIdleTimeout();
+
 const translations = {
   "LOCAL-FIRST SECURITY":"SEGURIDAD LOCAL", "YOUR PRIVATE SPACE":"TU ESPACIO PRIVADO", "Protect your files.":"Protege tus archivos.", "Without leaving your device.":"Sin salir de tu dispositivo.",
   "Local encryption and protected backups. Your original files are kept; Vault never deletes them automatically.":"Cifrado local y backups protegidos. Tus archivos originales se conservan; Vault nunca los elimina automáticamente.",
@@ -183,6 +244,17 @@ Object.assign(translations, {
   "PREFERENCES":"PREFERENCIAS", "Settings & profile":"Ajustes y perfil", "Public release · v0.1.0":"Lanzamiento público · v0.1.0", "Local profile":"Perfil local", "Your profile stays on this device and is not uploaded.":"Tu perfil permanece en este dispositivo y no se sube a ningún servidor.", "Display name":"Nombre visible", "Profile photo":"Foto de perfil", "Stored locally in this app.":"Guardada localmente en esta aplicación.", "Save profile":"Guardar perfil", "Appearance":"Apariencia", "Make Vault feel like your workspace.":"Adapta Vault a tu espacio de trabajo.", "Accent color":"Color de acento", "Typography":"Tipografía", "System minimal":"Sistema minimalista", "Elegant serif":"Serif elegante", "Monospace":"Monoespaciada", "The default palette is monochrome. Your accent and font choices are saved locally.":"La paleta predeterminada es monocromática. Tus colores y tipografía se guardan localmente.", "Apply appearance":"Aplicar apariencia", "Application":"Aplicación", "Build information and important limitations.":"Información de versión y limitaciones importantes.", "Version":"Versión", "0.1.0 · Public release":"0.1.0 · Lanzamiento público", "Data location":"Ubicación de los datos", "On this device":"En este dispositivo", "Telemetry":"Telemetría", "Disabled":"Desactivada", "This early-access release has not been independently audited. Keep separate backups of encrypted payloads and recovery material.":"Esta versión de acceso anticipado no ha sido auditada de forma independiente. Conserva copias separadas de los archivos cifrados y del material de recuperación.",
   "GETTING STARTED":"PRIMEROS PASOS", "Help & user guide":"Ayuda y guía de usuario", "Create your vault":"Crea tu vault", "Choose a location, create a strong unique password and keep it safe. The vault file stores your protected key material.":"Elige una ubicación, crea una contraseña única y robusta y guárdala de forma segura. El archivo vault almacena tus claves protegidas.", "Unlock your vault":"Desbloquea tu vault", "Select your existing .nqv file and enter its password. Lock the vault whenever you leave your computer.":"Selecciona tu archivo .nqv e introduce su contraseña. Bloquea el vault cuando te alejes del ordenador.", "Protect files and folders":"Protege archivos y carpetas", "Unlock first, then choose a file or folder to encrypt. Original files are not deleted automatically.":"Primero desbloquea el vault y después elige un archivo o carpeta para cifrar. Los originales no se eliminan automáticamente.", "Make a recovery backup":"Crea un backup de recuperación", "Create an encrypted .nqb backup with a separate strong passphrase. Store it separately from your encrypted files.":"Crea un backup .nqb cifrado con una contraseña independiente y robusta. Guárdalo separado de tus archivos cifrados.", "Restore safely":"Restaura de forma segura", "Use the backup passphrase to restore into a new vault. Keep the encrypted .nqx files and folder-vault data separately.":"Utiliza la contraseña del backup para restaurar en un vault nuevo. Conserva por separado los archivos .nqx y los datos de las carpetas vault.", "Important limitations":"Limitaciones importantes", "Folder encryption currently supports files up to 32 MiB, skips empty folders and rejects symbolic links. This early-access release has not been independently audited.":"El cifrado de carpetas admite archivos de hasta 32 MiB, omite carpetas vacías y rechaza enlaces simbólicos. Esta versión de acceso anticipado no ha sido auditada de forma independiente.", "Made for privacy":"Diseñado para la privacidad",
   "Browse":"Examinar", "Show":"Mostrar", "Hide":"Ocultar", "Generate strong password":"Generar contraseña segura", "Store your password in a password manager. An encrypted recovery backup can restore vault keys, but it cannot reveal your original password.":"Guarda tu contraseña en un gestor de contraseñas. Un backup cifrado puede restaurar las claves del vault, pero no revelar la contraseña original."
+});
+Object.assign(translations, {
+  "Automatic vault lock": "Bloqueo automático del vault",
+  "Lock after inactivity": "Bloquear tras inactividad",
+  "Lock the vault after a period without keyboard or pointer activity. This setting stays on this device.": "Bloquea el vault tras un periodo sin actividad de teclado o ratón. Este ajuste permanece en este dispositivo.",
+  "1 minute": "1 minuto",
+  "5 minutes": "5 minutos",
+  "10 minutes": "10 minutos",
+  "15 minutes": "15 minutos",
+  "30 minutes": "30 minutos",
+  "The countdown is enforced by the Rust backend. Closing the app also locks the vault. Desktop operating systems do not expose a portable screen-lock or suspend event through Tauri.": "La cuenta atrás la controla Rust. Cerrar la aplicación también bloquea el vault. Los sistemas de escritorio no exponen mediante Tauri un evento portable de bloqueo de pantalla o suspensión."
 });
 const themeToggle = $("theme-toggle");
 function translatePage(language) {

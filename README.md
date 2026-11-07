@@ -186,3 +186,7 @@ Issues and pull requests are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING
 ## License
 
 NEXUS-Q Vault is released under the [MIT License](LICENSE).
+
+## Automatic locking
+
+The desktop inactivity-lock behavior, configuration and platform limitations are documented in [docs/AUTO_LOCK.md](docs/AUTO_LOCK.md).
