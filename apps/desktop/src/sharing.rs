@@ -119,21 +119,50 @@ pub fn read_bounded_file(
     description: &str,
 ) -> Result<Zeroizing<Vec<u8>>, String> {
     let path = path.as_ref();
-    let path_metadata = fs::symlink_metadata(path)
-        .map_err(|error| format!("Could not inspect the {description}: {error}"))?;
-    if path_metadata.file_type().is_symlink() || !path_metadata.is_file() {
+    // Open without following links/reparse points, then validate the opened
+    // handle. Checking the path before File::open would leave a TOCTOU window
+    // in which an attacker could replace a regular file with a symlink.
+    let mut options = OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC | libc::O_NONBLOCK);
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::OpenOptionsExt;
+        // FILE_FLAG_OPEN_REPARSE_POINT: open the reparse point itself so the
+        // handle metadata check below can reject symlinks and other reparse points.
+        const FILE_FLAG_OPEN_REPARSE_POINT: u32 = 0x0020_0000;
+        options.custom_flags(FILE_FLAG_OPEN_REPARSE_POINT);
+    }
+    let mut file = options
+        .open(path)
+        .map_err(|error| format!("Could not safely open the {description}: {error}"))?;
+    let metadata = file
+        .metadata()
+        .map_err(|error| format!("Could not inspect the opened {description}: {error}"))?;
+    #[cfg(windows)]
+    let is_link_or_reparse_point = {
+        use std::os::windows::fs::MetadataExt;
+        const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x0000_0400;
+        metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
+    };
+    #[cfg(not(windows))]
+    let is_link_or_reparse_point = metadata.file_type().is_symlink();
+    if is_link_or_reparse_point || !metadata.is_file() {
         return Err(format!(
-            "The {description} must be a regular file, not a symbolic link"
+            "The {description} must be a regular file, not a symbolic link or reparse point"
         ));
     }
-    if path_metadata.len() > max_bytes {
+    if metadata.len() > max_bytes {
         return Err(format!(
             "The {description} exceeds the supported size limit"
         ));
     }
-    let mut file =
-        File::open(path).map_err(|error| format!("Could not open the {description}: {error}"))?;
-    let mut bytes = Zeroizing::new(Vec::with_capacity(path_metadata.len() as usize));
+    let capacity = usize::try_from(metadata.len()).unwrap_or(0);
+    let mut bytes = Zeroizing::new(Vec::with_capacity(capacity));
     Read::by_ref(&mut file)
         .take(max_bytes.saturating_add(1))
         .read_to_end(bytes.as_mut())
@@ -181,6 +210,98 @@ pub fn write_new_atomic(path: impl AsRef<Path>, bytes: &[u8]) -> Result<(), Stri
     })
 }
 
+#[cfg(windows)]
+fn create_private_temp_file(path: &Path) -> std::io::Result<File> {
+    use std::{
+        ffi::c_void,
+        os::windows::{ffi::OsStrExt, io::FromRawHandle},
+        ptr,
+    };
+
+    #[repr(C)]
+    struct SecurityAttributes {
+        length: u32,
+        security_descriptor: *mut c_void,
+        inherit_handle: i32,
+    }
+
+    #[link(name = "advapi32")]
+    unsafe extern "system" {
+        fn ConvertStringSecurityDescriptorToSecurityDescriptorW(
+            descriptor: *const u16,
+            revision: u32,
+            output: *mut *mut c_void,
+            size: *mut u32,
+        ) -> i32;
+    }
+    #[link(name = "kernel32")]
+    unsafe extern "system" {
+        fn CreateFileW(
+            filename: *const u16,
+            desired_access: u32,
+            share_mode: u32,
+            security_attributes: *mut SecurityAttributes,
+            creation_disposition: u32,
+            flags_and_attributes: u32,
+            template_file: isize,
+        ) -> isize;
+        fn LocalFree(memory: *mut c_void) -> *mut c_void;
+    }
+
+    // Protected DACL: grant full access only to the file owner. The descriptor
+    // is applied atomically by CreateFileW, before any plaintext is written.
+    let sddl: Vec<u16> = "D:P(A;;FA;;;OW)\0".encode_utf16().collect();
+    let mut descriptor = ptr::null_mut();
+    let converted = unsafe {
+        ConvertStringSecurityDescriptorToSecurityDescriptorW(
+            sddl.as_ptr(),
+            1,
+            &mut descriptor,
+            ptr::null_mut(),
+        )
+    };
+    if converted == 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+
+    let mut attributes = SecurityAttributes {
+        length: std::mem::size_of::<SecurityAttributes>() as u32,
+        security_descriptor: descriptor,
+        inherit_handle: 0,
+    };
+    let filename: Vec<u16> = path.as_os_str().encode_wide().chain(Some(0)).collect();
+    let handle = unsafe {
+        CreateFileW(
+            filename.as_ptr(),
+            0x4000_0000, // GENERIC_WRITE
+            0,           // no sharing while the private file is being populated
+            &mut attributes,
+            1,    // CREATE_NEW
+            0x80, // FILE_ATTRIBUTE_NORMAL
+            0,
+        )
+    };
+    unsafe {
+        LocalFree(descriptor);
+    }
+    if handle == -1 {
+        return Err(std::io::Error::last_os_error());
+    }
+    Ok(unsafe { File::from_raw_handle(handle as _) })
+}
+
+#[cfg(not(windows))]
+fn create_private_temp_file(path: &Path) -> std::io::Result<File> {
+    let mut options = OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    options.open(path)
+}
+
 fn write_new_atomic_with(
     path: &Path,
     bytes: &[u8],
@@ -201,14 +322,7 @@ fn write_new_atomic_with(
         let mut temp_name = file_name.to_os_string();
         temp_name.push(format!(".tmp-{}-{timestamp}-{counter}", std::process::id()));
         let temp_path = parent.join(temp_name);
-        let mut options = OpenOptions::new();
-        options.write(true).create_new(true);
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::OpenOptionsExt;
-            options.mode(0o600);
-        }
-        let mut file = match options.open(&temp_path) {
+        let mut file = match create_private_temp_file(&temp_path) {
             Ok(file) => file,
             Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
             Err(error) => return Err(format!("Could not create temporary output: {error}")),
@@ -340,6 +454,119 @@ mod tests {
             std::os::unix::fs::symlink(&file, &link).unwrap();
             assert!(read_bounded_file(&link, 10, "test file").is_err());
         }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn private_temporary_files_are_created_with_owner_only_permissions() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("private-plaintext.tmp");
+        let file = create_private_temp_file(&path).unwrap();
+        let mode = file.metadata().unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o600);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn private_temporary_files_have_a_protected_owner_only_dacl() {
+        use std::{ffi::c_void, os::windows::ffi::OsStrExt, ptr, slice};
+        #[link(name = "advapi32")]
+        unsafe extern "system" {
+            fn GetNamedSecurityInfoW(
+                object_name: *mut u16,
+                object_type: u32,
+                security_info: u32,
+                owner: *mut *mut c_void,
+                group: *mut *mut c_void,
+                dacl: *mut *mut c_void,
+                sacl: *mut *mut c_void,
+                security_descriptor: *mut *mut c_void,
+            ) -> u32;
+            fn ConvertSecurityDescriptorToStringSecurityDescriptorW(
+                security_descriptor: *mut c_void,
+                revision: u32,
+                security_information: u32,
+                output: *mut *mut u16,
+                output_len: *mut u32,
+            ) -> i32;
+        }
+        #[link(name = "kernel32")]
+        unsafe extern "system" {
+            fn LocalFree(memory: *mut c_void) -> *mut c_void;
+        }
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("private-plaintext.tmp");
+        let _file = create_private_temp_file(&path).unwrap();
+        let mut wide_path: Vec<u16> = path.as_os_str().encode_wide().collect();
+        wide_path.push(0);
+        let mut descriptor = ptr::null_mut();
+        let status = unsafe {
+            GetNamedSecurityInfoW(
+                wide_path.as_mut_ptr(),
+                1,
+                0x0000_0004,
+                ptr::null_mut(),
+                ptr::null_mut(),
+                ptr::null_mut(),
+                ptr::null_mut(),
+                &mut descriptor,
+            )
+        };
+        assert_eq!(status, 0, "GetNamedSecurityInfoW failed: {status}");
+        let mut sddl = ptr::null_mut();
+        let mut sddl_len = 0;
+        let converted = unsafe {
+            ConvertSecurityDescriptorToStringSecurityDescriptorW(
+                descriptor,
+                1,
+                0x0000_0004,
+                &mut sddl,
+                &mut sddl_len,
+            )
+        };
+        assert_ne!(converted, 0, "could not convert the file DACL to SDDL");
+        let actual =
+            String::from_utf16_lossy(unsafe { slice::from_raw_parts(sddl, sddl_len as usize) });
+        unsafe {
+            LocalFree(sddl.cast());
+            LocalFree(descriptor);
+        }
+        assert!(
+            actual.contains("D:P(A;;FA;;;OW)"),
+            "unexpected temporary-file DACL: {actual}"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn bounded_reader_rejects_named_pipes_without_blocking() {
+        use std::{ffi::CString, os::unix::ffi::OsStrExt};
+        let dir = TempDir::new().unwrap();
+        let fifo = dir.path().join("input.fifo");
+        let name = CString::new(fifo.as_os_str().as_bytes()).unwrap();
+        let result = unsafe { libc::mkfifo(name.as_ptr(), 0o600) };
+        assert_eq!(result, 0);
+        assert!(read_bounded_file(&fifo, 16, "test input").is_err());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn bounded_reader_rejects_file_and_directory_reparse_points() {
+        use std::os::windows::fs::{symlink_dir, symlink_file};
+        let dir = TempDir::new().unwrap();
+        let target_file = dir.path().join("target.txt");
+        let target_dir = dir.path().join("target-dir");
+        fs::write(&target_file, b"private").unwrap();
+        fs::create_dir(&target_dir).unwrap();
+        let file_link = dir.path().join("file-link.txt");
+        let dir_link = dir.path().join("dir-link");
+        symlink_file(&target_file, &file_link)
+            .expect("Windows CI must permit creating file symlinks");
+        symlink_dir(&target_dir, &dir_link)
+            .expect("Windows CI must permit creating directory symlinks");
+        assert!(read_bounded_file(&file_link, 64, "test file").is_err());
+        assert!(read_bounded_file(&dir_link, 64, "test file").is_err());
     }
 
     #[test]

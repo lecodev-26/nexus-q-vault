@@ -46,6 +46,9 @@ jobs:
       - name: Run tests
         run: cargo test --locked
 
+      - name: Run desktop application tests (including Windows hardening tests)
+        run: cargo test --manifest-path apps/desktop/Cargo.toml --locked --bin nexus-q-vault-desktop
+
   desktop:
     name: Desktop build (${{ matrix.os }})
     strategy:
