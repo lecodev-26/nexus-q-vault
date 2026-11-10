@@ -8,11 +8,12 @@ const lockButton = $("lock-button");
 let vaultUnlocked = false;
 const operationList = $("operation-list");
 const operationCards = new Map();
-const trackedCommands = new Set(["encrypt_file", "decrypt_file", "encrypt_folder", "decrypt_folder", "export_backup", "import_backup"]);
+const trackedCommands = new Set(["encrypt_file", "decrypt_file", "encrypt_folder", "decrypt_folder", "export_backup", "import_backup", "create_shared_package", "open_shared_package"]);
 const operationTitles = {
   encrypt_file: "Encrypting file", decrypt_file: "Restoring file",
   encrypt_folder: "Encrypting folder", decrypt_folder: "Restoring folder",
   export_backup: "Creating key backup", import_backup: "Restoring key backup",
+  create_shared_package: "Creating shared package", open_shared_package: "Opening shared package",
 };
 const operationContexts = {
   encrypt_file: "Source file → encrypted .nqx output",
@@ -21,6 +22,8 @@ const operationContexts = {
   decrypt_folder: "Folder vault → restored folder",
   export_backup: "Vault state and keys → .nqb backup",
   import_backup: ".nqb backup → new vault",
+  create_shared_package: "Source file → recipient-encrypted .nqx package",
+  open_shared_package: "Encrypted .nqx package → recovered file",
 };
 const phaseTitles = {
   preparing: "Preparing", readingInput: "Reading input", processing: "Processing",
@@ -179,8 +182,9 @@ async function refreshStatus() {
     statusLabel.textContent = t(unlocked ? "Unlocked" : "Locked");
     statusDot.classList.toggle("active", unlocked);
     refreshLockButtonAvailability();
-    document.querySelectorAll(".workspace input,.workspace button[type=submit],.workspace .picker,.workspace .reveal")
+    document.querySelectorAll(".workspace input,.workspace select,.workspace button")
       .forEach((el) => { el.disabled = !unlocked; });
+    if (unlocked) await refreshSharingData();
   } catch (error) {
     showMessage(String(error), true);
   }
@@ -277,6 +281,167 @@ function bindPicker(buttonId, inputId, command, kind, transform = (path) => path
     }
   });
 }
+
+const SHARE_CONTACTS_KEY = "nexusq-share-contacts-v1";
+let pendingContactCard = null;
+
+function storedVerifiedContacts() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(SHARE_CONTACTS_KEY) || "[]");
+    return Array.isArray(parsed) ? parsed.filter((item) => item?.verified === true && item.card?.fingerprint) : [];
+  } catch { return []; }
+}
+
+function saveVerifiedContacts(contacts) {
+  localStorage.setItem(SHARE_CONTACTS_KEY, JSON.stringify(contacts));
+}
+
+function refreshVerifiedContacts() {
+  const contacts = storedVerifiedContacts();
+  const select = $("share-recipient");
+  const previous = select.value;
+  select.replaceChildren();
+  if (!contacts.length) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = t("Import and verify a contact first");
+    select.append(option);
+    $("share-contact-card-json").value = "";
+  } else {
+    for (const item of contacts) {
+      const option = document.createElement("option");
+      option.value = item.card.key_id;
+      option.textContent = `${item.card.label} · ${item.card.fingerprint.slice(-16)}`;
+      select.append(option);
+    }
+    select.value = contacts.some((item) => item.card.key_id === previous) ? previous : contacts[0].card.key_id;
+    const selected = contacts.find((item) => item.card.key_id === select.value);
+    $("share-contact-card-json").value = JSON.stringify(selected.card);
+  }
+  const list = $("verified-contacts-list");
+  list.replaceChildren();
+  if (!contacts.length) {
+    list.textContent = t("No verified contacts imported.");
+  } else {
+    for (const item of contacts) {
+      const entry = document.createElement("p");
+      entry.textContent = `${item.card.label} · ${item.card.fingerprint}`;
+      list.append(entry);
+    }
+  }
+}
+
+async function refreshSharingData(preferredKeyId = "") {
+  refreshVerifiedContacts();
+  try {
+    const identities = await invoke("list_receiving_identities");
+    const select = $("receiving-identity-select");
+    const previous = preferredKeyId || select.value;
+    select.replaceChildren();
+    if (!identities.length) {
+      const option = document.createElement("option");
+      option.value = "";
+      option.textContent = t("Create a receiving identity first");
+      select.append(option);
+    } else {
+      for (const identity of identities) {
+        const option = document.createElement("option");
+        option.value = identity.key_id;
+        const keyStatus = identity.status === "retired" ? t("Retired") : identity.status === "rotating" ? t("Rotating") : t("Active");
+        option.textContent = `${identity.label} · ${keyStatus} · ${identity.fingerprint.slice(-16)}`;
+        select.append(option);
+      }
+      select.value = identities.some((identity) => identity.key_id === previous) ? previous : identities[0].key_id;
+    }
+    const selectedIdentity = identities.find((identity) => identity.key_id === select.value);
+    $("export-receiving-contact").disabled = !selectedIdentity || selectedIdentity.status !== "active" || !vaultUnlocked;
+  } catch (error) {
+    showMessage(String(error), true);
+  }
+}
+
+$("create-receiving-form")?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!vaultUnlocked) return showMessage(t("Unlock your vault first."), true);
+  const button = event.currentTarget.querySelector('button[type="submit"]');
+  const original = button.textContent;
+  button.disabled = true;
+  button.textContent = t("Processing…");
+  try {
+    const card = await invoke("create_receiving_identity", { label: $("receiving-label").value });
+    $("receiving-card-summary").hidden = false;
+    $("receiving-card-summary").textContent = `${t("Receiving identity created")}: ${card.label} · ${t("Fingerprint")}: ${card.fingerprint}. ${t("Export and keep this public card safe; back up your vault keys separately.")}`;
+    await refreshSharingData(card.key_id);
+    showMessage(t("Receiving identity created."));
+  } catch (error) {
+    showMessage(String(error), true);
+    await refreshSharingData();
+  } finally {
+    button.textContent = original;
+    button.disabled = !vaultUnlocked;
+  }
+});
+
+$("receiving-identity-select")?.addEventListener("change", async () => {
+  const identities = await invoke("list_receiving_identities").catch(() => []);
+  const selected = identities.find((identity) => identity.key_id === $("receiving-identity-select").value);
+  $("export-receiving-contact").disabled = !selected || selected.status !== "active" || !vaultUnlocked;
+});
+
+$("export-receiving-contact")?.addEventListener("click", async () => {
+  const identityKeyId = $("receiving-identity-select").value;
+  const outputPath = $("receiving-contact-export-path").value;
+  if (!identityKeyId || !outputPath) return showMessage(t("Choose a receiving identity and contact card destination."), true);
+  const identity = await invoke("list_receiving_identities").then((items) => items.find((item) => item.key_id === identityKeyId));
+  if (!identity) return showMessage(t("The selected receiving identity is unavailable."), true);
+  try {
+    showMessage(await invoke("export_receiving_contact", { identityId: identity.identity_id, outputPath }));
+  } catch (error) { showMessage(String(error), true); }
+});
+
+$("import-contact-button")?.addEventListener("click", async () => {
+  const path = $("contact-import-path").value;
+  if (!path) return showMessage(t("Select a contact card first."), true);
+  try {
+    pendingContactCard = await invoke("import_contact_card", { path });
+    $("pending-contact-details").hidden = false;
+    $("pending-contact-summary").textContent = `${t("Recipient")}: ${pendingContactCard.label} · ${t("Identity")}: ${pendingContactCard.identity_id} · ${t("Fingerprint")}: ${pendingContactCard.fingerprint}. ${t("Compare every fingerprint group with the recipient through a separate trusted channel. A valid card alone does not prove who sent it.")}`;
+    $("verify-contact-checkbox").checked = false;
+    $("save-contact-button").disabled = true;
+    showMessage(t("Contact card read. Verify its fingerprint before saving."));
+  } catch (error) { showMessage(String(error), true); }
+});
+
+$("verify-contact-checkbox")?.addEventListener("change", (event) => {
+  $("save-contact-button").disabled = !event.target.checked || !pendingContactCard || !vaultUnlocked;
+});
+
+$("save-contact-button")?.addEventListener("click", () => {
+  if (!pendingContactCard || !$("verify-contact-checkbox").checked) return;
+  const contacts = storedVerifiedContacts().filter((item) => item.card.key_id !== pendingContactCard.key_id);
+  contacts.push({ card: pendingContactCard, verified: true, verifiedAt: new Date().toISOString() });
+  saveVerifiedContacts(contacts);
+  pendingContactCard = null;
+  $("pending-contact-details").hidden = true;
+  $("verify-contact-checkbox").checked = false;
+  refreshVerifiedContacts();
+  showMessage(t("Verified contact saved on this device."));
+});
+
+$("share-recipient")?.addEventListener("change", () => {
+  const selected = storedVerifiedContacts().find((item) => item.card.key_id === $("share-recipient").value);
+  $("share-contact-card-json").value = selected ? JSON.stringify(selected.card) : "";
+});
+
+submit("share-file-form", "create_shared_package", [["inputPath", "share-source-path"], ["outputPath", "share-package-path"], ["contactCardJson", "share-contact-card-json"]]);
+submit("open-shared-form", "open_shared_package", [["inputPath", "shared-package-input"], ["outputPath", "shared-output-path"], ["keyId", "receiving-identity-select"]]);
+
+bindPicker("receiving-contact-export-picker", "receiving-contact-export-path", "pick_save_path", "contact");
+bindPicker("contact-import-picker", "contact-import-path", "pick_file_path", "contact");
+bindPicker("share-source-picker", "share-source-path", "pick_file_path", "any");
+bindPicker("share-package-picker", "share-package-path", "pick_save_path", "shared");
+bindPicker("shared-package-input-picker", "shared-package-input", "pick_file_path", "shared");
+bindPicker("shared-output-picker", "shared-output-path", "pick_save_path", "restored");
 
 submit("create-form", "create_vault", [["path", "create-path"], ["password", "create-password"], ["passwordConfirmation", "create-password-confirm"]]);
 submit("open-form", "open_vault", [["path", "open-path"], ["password", "open-password"]]);

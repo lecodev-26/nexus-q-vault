@@ -1,10 +1,13 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod sharing;
+
+use nexusq_core::identity::IdentityId;
 use nexusq_core::{
     storage::backup,
     vault::{
-        Algorithm, KeyId, KeyStatus, OperationControl, OperationPhase, OperationProgress, Purpose,
-        Session, Vault,
+        Algorithm, DestructionConfirmation, KeyId, KeyStatus, OperationControl, OperationPhase,
+        OperationProgress, Purpose, Session, Vault,
     },
 };
 use std::{
@@ -483,6 +486,293 @@ async fn decrypt_file(
     })
 }
 
+#[derive(Clone, serde::Serialize)]
+struct ReceivingIdentitySummary {
+    identity_id: String,
+    label: String,
+    key_id: String,
+    status: String,
+    fingerprint: String,
+}
+
+fn contact_card_for_identity(
+    session: &Session,
+    identity_id: &IdentityId,
+) -> Result<sharing::ContactCard, String> {
+    let identity = session
+        .find_identity(identity_id)
+        .ok_or_else(|| "The receiving identity no longer exists in this vault".to_string())?;
+    if !identity.is_active() {
+        return Err("This identity is not active and cannot receive new shared files".into());
+    }
+    let key_id = identity
+        .key_agreement_key
+        .as_ref()
+        .ok_or_else(|| "This identity has no receiving key configured".to_string())?;
+    let key = session
+        .find_key(key_id)
+        .ok_or_else(|| "The receiving key is missing from this vault".to_string())?;
+    if key.metadata.owner.as_deref() != Some(identity_id.as_str())
+        || key.algorithm() != Algorithm::MlKem768
+        || key.purpose() != Purpose::KeyAgreement
+        || key.status() != KeyStatus::Active
+    {
+        return Err("The receiving key is not active or is not a supported ML-KEM-768 key".into());
+    }
+    let public_key = key
+        .public_key_bytes()
+        .ok_or_else(|| "The receiving key has no public component".to_string())?
+        .to_vec();
+    sharing::ContactCard::new(
+        identity_id.to_string(),
+        identity
+            .metadata
+            .label
+            .clone()
+            .unwrap_or_else(|| "NEXUS-Q recipient".into()),
+        key_id.to_string(),
+        public_key,
+    )
+}
+
+fn create_receiving_identity_records_with(
+    session: &mut Session,
+    label: String,
+    create_identity: impl FnOnce(
+        &mut Session,
+        String,
+    ) -> Result<IdentityId, nexusq_core::vault::VaultError>,
+    destroy_key: impl FnOnce(&mut Session, &KeyId) -> Result<(), nexusq_core::vault::VaultError>,
+) -> Result<(IdentityId, KeyId), String> {
+    let key_id = session
+        .generate_key(Algorithm::MlKem768, Purpose::KeyAgreement)
+        .map_err(|error| format!("Could not generate the receiving key: {error}"))?;
+    let identity_id = match create_identity(session, label) {
+        Ok(identity_id) => identity_id,
+        Err(error) => {
+            return match destroy_key(session, &key_id) {
+                Ok(()) => Err(format!(
+                    "Could not create the receiving identity: {error}. The generated key {key_id} was destroyed."
+                )),
+                Err(cleanup_error) => Err(format!(
+                    "Could not create the receiving identity: {error}. Best-effort cleanup of generated key {key_id} also failed: {cleanup_error}. Cleanup could not be confirmed; inspect key {key_id} after reopening the vault, because an audit-write failure can leave its in-memory status changed without persisting it. If it is still generated, retry Core's explicit key-destruction operation after resolving the policy/audit issue."
+                )),
+            };
+        }
+    };
+    {
+        let key = session
+            .find_key_mut(&key_id)
+            .map_err(|error| format!("Could not bind the receiving key to its identity: {error}"))?
+            .ok_or_else(|| "The newly generated receiving key could not be found".to_string())?;
+        key.metadata.owner = Some(identity_id.to_string());
+    }
+    {
+        let identity = session
+            .find_identity_mut(&identity_id)
+            .map_err(|error| format!("Could not update the receiving identity: {error}"))?
+            .ok_or_else(|| "The new receiving identity could not be found".to_string())?;
+        identity.key_agreement_key = Some(key_id.clone());
+        identity
+            .validate()
+            .map_err(|error| format!("The receiving identity is invalid: {error}"))?;
+    }
+    session
+        .activate_key(&key_id)
+        .map_err(|error| format!("Could not activate the receiving key: {error}"))?;
+    Ok((identity_id, key_id))
+}
+
+#[tauri::command]
+fn create_receiving_identity(
+    state: State<'_, AppState>,
+    label: String,
+) -> Result<sharing::ContactCard, String> {
+    let label = label.trim().to_string();
+    if label.is_empty() || label.len() > 80 || label.chars().any(char::is_control) {
+        return Err("Use a display name between 1 and 80 characters".into());
+    }
+    let mut guard = active_session(&state)?;
+    let session = guard.as_mut().expect("active_session checked");
+    let (identity_id, _key_id) = create_receiving_identity_records_with(
+        session,
+        label,
+        |session, label| session.create_identity(Some(label)),
+        |session, key_id| session.destroy_key(key_id, DestructionConfirmation::Explicit),
+    )?;
+    let card = contact_card_for_identity(session, &identity_id)?;
+    touch_activity(&state)?;
+    Ok(card)
+}
+
+#[tauri::command]
+fn list_receiving_identities(
+    state: State<'_, AppState>,
+) -> Result<Vec<ReceivingIdentitySummary>, String> {
+    let guard = active_session(&state)?;
+    let session = guard.as_ref().expect("active_session checked");
+    let mut identities = Vec::new();
+    for identity in session
+        .list_identities()
+        .filter(|identity| identity.is_active())
+    {
+        for key in session.list_keys().filter(|key| {
+            key.metadata.owner.as_deref() == Some(identity.id.as_str())
+                && key.algorithm() == Algorithm::MlKem768
+                && key.purpose() == Purpose::KeyAgreement
+                && matches!(
+                    key.status(),
+                    KeyStatus::Active | KeyStatus::Rotating | KeyStatus::Retired
+                )
+        }) {
+            let Some(public_key) = key.public_key_bytes() else {
+                continue;
+            };
+            let card = sharing::ContactCard::new(
+                identity.id.to_string(),
+                identity
+                    .metadata
+                    .label
+                    .clone()
+                    .unwrap_or_else(|| "NEXUS-Q recipient".into()),
+                key.key_id().to_string(),
+                public_key.to_vec(),
+            )?;
+            identities.push(ReceivingIdentitySummary {
+                identity_id: card.identity_id,
+                label: card.label,
+                key_id: card.key_id,
+                status: key.status().as_str().to_string(),
+                fingerprint: card.fingerprint,
+            });
+        }
+    }
+    Ok(identities)
+}
+
+#[tauri::command]
+fn export_receiving_contact(
+    state: State<'_, AppState>,
+    identity_id: String,
+    output_path: String,
+) -> Result<String, String> {
+    if output_path.trim().is_empty() {
+        return Err("Choose where to save the contact card".into());
+    }
+    if std::path::Path::new(&output_path)
+        .extension()
+        .and_then(|value| value.to_str())
+        != Some("nqcontact")
+    {
+        return Err("Contact cards must use the .nqcontact extension".into());
+    }
+    let identity_id = identity_id
+        .parse::<IdentityId>()
+        .map_err(|_| "The receiving identity identifier is invalid".to_string())?;
+    let guard = active_session(&state)?;
+    let session = guard.as_ref().expect("active_session checked");
+    let card = contact_card_for_identity(session, &identity_id)?;
+    let encoded = serde_json::to_vec_pretty(&card)
+        .map_err(|_| "Could not encode the contact card".to_string())?;
+    sharing::write_new_atomic(&output_path, &encoded)?;
+    touch_activity(&state)?;
+    Ok(format!("Contact card exported to {output_path}"))
+}
+
+#[tauri::command]
+fn import_contact_card(path: String) -> Result<sharing::ContactCard, String> {
+    if path.trim().is_empty() {
+        return Err("Select a contact card to import".into());
+    }
+    sharing::read_contact_card(path)
+}
+
+#[tauri::command]
+async fn create_shared_package(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    input_path: String,
+    output_path: String,
+    contact_card_json: String,
+    operation_id: String,
+) -> Result<String, String> {
+    if input_path.trim().is_empty() || output_path.trim().is_empty() {
+        return Err("Choose the file to share and a new package destination".into());
+    }
+    if std::path::Path::new(&output_path)
+        .extension()
+        .and_then(|value| value.to_str())
+        != Some("nqx")
+    {
+        return Err("Shared packages must use the .nqx extension".into());
+    }
+    with_operation(&app, &state, &operation_id, |control| {
+        let _session = active_session(&state)?;
+        if control.is_cancelled() {
+            return Err("operation cancelled".into());
+        }
+        let card: sharing::ContactCard = serde_json::from_str(&contact_card_json)
+            .map_err(|_| "The selected contact card is invalid".to_string())?;
+        emit_operation_event(&app, &operation_id, "running", None, None);
+        sharing::create_shared_package_file(&input_path, &output_path, &card, || {
+            control.is_cancelled()
+        })?;
+        touch_activity(&state)?;
+        Ok("Encrypted package created. The original file was not modified.".into())
+    })
+}
+
+#[tauri::command]
+async fn open_shared_package(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    input_path: String,
+    output_path: String,
+    key_id: String,
+    operation_id: String,
+) -> Result<String, String> {
+    if input_path.trim().is_empty() || output_path.trim().is_empty() || key_id.trim().is_empty() {
+        return Err("Choose the shared package, receiving identity and a new destination".into());
+    }
+    let key_id = key_id
+        .parse::<KeyId>()
+        .map_err(|_| "The selected receiving key identifier is invalid".to_string())?;
+    with_operation(&app, &state, &operation_id, |control| {
+        let guard = active_session(&state)?;
+        if control.is_cancelled() {
+            return Err("operation cancelled".into());
+        }
+        let package = sharing::read_bounded_file(
+            &input_path,
+            sharing::MAX_SHARED_PACKAGE_BYTES,
+            "shared package",
+        )?;
+        if control.is_cancelled() {
+            return Err("operation cancelled".into());
+        }
+        emit_operation_event(&app, &operation_id, "running", None, None);
+        let session = guard.as_ref().expect("active_session checked");
+        let belongs_to_active_identity = session.list_identities().any(|identity| {
+            identity.is_active()
+                && session
+                    .find_key(&key_id)
+                    .is_some_and(|key| key.metadata.owner.as_deref() == Some(identity.id.as_str()))
+        });
+        if !belongs_to_active_identity {
+            return Err("The selected key is not attached to an active receiving identity".into());
+        }
+        let plaintext = session
+            .open_envelope_with_key_agreement(&key_id, package.as_slice())
+            .map_err(|error| format!("Could not open the shared package: {error}"))?;
+        if control.is_cancelled() {
+            return Err("operation cancelled".into());
+        }
+        sharing::write_new_atomic(&output_path, plaintext.as_slice())?;
+        touch_activity(&state)?;
+        Ok("Shared file recovered successfully. Sender identity has not been verified.".into())
+    })
+}
+
 #[tauri::command]
 async fn encrypt_folder(
     app: AppHandle,
@@ -678,11 +968,17 @@ async fn pick_file_path(app: AppHandle, kind: String) -> Result<Option<String>, 
             .set_title("Seleccionar backup cifrado")
             .add_filter("Backup NEXUS-Q", &["nqb"])
             .blocking_pick_file(),
-        "encrypted" => app
+        "encrypted" | "shared" => app
             .dialog()
             .file()
             .set_title("Seleccionar archivo cifrado")
             .add_filter("Archivo NEXUS-Q", &["nqx"])
+            .blocking_pick_file(),
+        "contact" => app
+            .dialog()
+            .file()
+            .set_title("Seleccionar tarjeta de contacto")
+            .add_filter("Tarjeta de contacto NEXUS-Q", &["nqcontact"])
             .blocking_pick_file(),
         "any" => app
             .dialog()
@@ -716,6 +1012,20 @@ async fn pick_save_path(app: AppHandle, kind: String) -> Result<Option<String>, 
             .file()
             .set_title("Guardar archivo restaurado")
             .set_file_name("restored-file")
+            .blocking_save_file(),
+        "shared" => app
+            .dialog()
+            .file()
+            .set_title("Guardar paquete cifrado")
+            .add_filter("Paquete NEXUS-Q", &["nqx"])
+            .set_file_name("shared-file.nqx")
+            .blocking_save_file(),
+        "contact" => app
+            .dialog()
+            .file()
+            .set_title("Guardar tarjeta de contacto")
+            .add_filter("Tarjeta de contacto NEXUS-Q", &["nqcontact"])
+            .set_file_name("nexus-q-contact.nqcontact")
             .blocking_save_file(),
         _ => return Err("Tipo de destino no válido".into()),
     };
@@ -784,6 +1094,12 @@ fn main() {
             cancel_operation,
             encrypt_file,
             decrypt_file,
+            create_receiving_identity,
+            list_receiving_identities,
+            export_receiving_contact,
+            import_contact_card,
+            create_shared_package,
+            open_shared_package,
             encrypt_folder,
             decrypt_folder,
             export_backup,
@@ -1095,5 +1411,58 @@ mod password_confirmation_tests {
         assert!(confirmed_secret(String::new(), String::new(), "password").is_err());
         assert!(confirmed_secret(String::new(), "non-empty".into(), "password").is_err());
         assert!(confirmed_secret("password".into(), " password".into(), "password").is_err());
+    }
+}
+
+#[cfg(test)]
+mod receiving_identity_failure_tests {
+    use super::*;
+    use nexusq_core::vault::{KeyStatus, VaultError};
+    use tempfile::TempDir;
+
+    #[test]
+    fn identity_creation_failure_best_effort_destroys_the_generated_key() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("receiving.nqv");
+        let vault = Vault::create(&path, b"test-password", None).unwrap();
+        let mut session = vault.unlock(b"test-password").unwrap();
+
+        let error = create_receiving_identity_records_with(
+            &mut session,
+            "Alice".into(),
+            |_session, _label| Err(VaultError::WrongPassword),
+            |session, key_id| session.destroy_key(key_id, DestructionConfirmation::Explicit),
+        )
+        .unwrap_err();
+
+        assert!(error.contains("was destroyed"));
+        let keys: Vec<_> = session.list_keys().collect();
+        assert_eq!(keys.len(), 1);
+        assert_eq!(keys[0].status(), KeyStatus::Destroyed);
+        assert!(session.list_identities().next().is_none());
+    }
+
+    #[test]
+    fn identity_creation_failure_reports_when_best_effort_key_cleanup_fails() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("receiving.nqv");
+        let vault = Vault::create(&path, b"test-password", None).unwrap();
+        let mut session = vault.unlock(b"test-password").unwrap();
+
+        let error = create_receiving_identity_records_with(
+            &mut session,
+            "Alice".into(),
+            |_session, _label| Err(VaultError::WrongPassword),
+            |_session, _key_id| Err(VaultError::WrongPassword),
+        )
+        .unwrap_err();
+
+        assert!(error.contains("Best-effort cleanup"));
+        assert!(error.contains("Cleanup could not be confirmed"));
+        assert!(error.contains("after reopening the vault"));
+        let keys: Vec<_> = session.list_keys().collect();
+        assert_eq!(keys.len(), 1);
+        assert_eq!(keys[0].status(), KeyStatus::Generated);
+        assert!(session.list_identities().next().is_none());
     }
 }

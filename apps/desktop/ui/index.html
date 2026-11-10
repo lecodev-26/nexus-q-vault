@@ -123,6 +123,75 @@
           <button class="secondary" type="submit">Restaurar archivo</button>
         </form>
 
+        <form id="create-receiving-form" class="operation">
+          <h4>Prepare to receive shared files</h4>
+          <p>Create a receiving identity in this vault. Its private key remains protected by the vault and is included in the encrypted .nqb key backup.</p>
+          <label for="receiving-label">Identity display name</label>
+          <input id="receiving-label" maxlength="80" required placeholder="Your name or contact label">
+          <button class="secondary" type="submit">Create receiving identity</button>
+          <p id="receiving-card-summary" class="settings-note" aria-live="polite" hidden></p>
+          <label for="receiving-contact-export-path">Export public contact card</label>
+          <div class="path-row">
+            <input id="receiving-contact-export-path" placeholder="/path/contact.nqcontact">
+            <button id="receiving-contact-export-picker" class="picker" type="button" aria-label="Choose contact card destination">Browse</button>
+          </div>
+          <button id="export-receiving-contact" class="secondary" type="button" disabled>Export contact card</button>
+        </form>
+
+        <form id="import-contact-form" class="operation">
+          <h4>Import and verify a recipient</h4>
+          <p>Import a public contact card, then compare its fingerprint with the recipient through a separate trusted channel before sharing.</p>
+          <label for="contact-import-path">Contact card (.nqcontact)</label>
+          <div class="path-row">
+            <input id="contact-import-path" placeholder="/path/contact.nqcontact">
+            <button id="contact-import-picker" class="picker" type="button" aria-label="Select contact card">Browse</button>
+          </div>
+          <button id="import-contact-button" class="secondary" type="button">Read contact card</button>
+          <div id="pending-contact-details" hidden>
+            <p id="pending-contact-summary" class="settings-note" aria-live="polite"></p>
+            <label class="backup-check"><input id="verify-contact-checkbox" type="checkbox"> I compared this full fingerprint with the recipient over a separate trusted channel.</label>
+            <button id="save-contact-button" class="secondary" type="button" disabled>Save verified contact</button>
+          </div>
+          <div id="verified-contacts-list" class="settings-note" aria-live="polite">No verified contacts imported.</div>
+        </form>
+
+        <form id="share-file-form" class="operation">
+          <h4>Share an encrypted file</h4>
+          <p>One file and one verified recipient per package. Files up to 32 MiB are supported. The filename is not embedded in the public envelope.</p>
+          <label for="share-source-path">Original file</label>
+          <div class="path-row">
+            <input id="share-source-path" required placeholder="/path/document.pdf">
+            <button id="share-source-picker" class="picker" type="button" aria-label="Select file to share">Browse</button>
+          </div>
+          <label for="share-recipient">Verified recipient</label>
+          <select id="share-recipient" required><option value="">Import and verify a contact first</option></select>
+          <input id="share-contact-card-json" type="hidden">
+          <label for="share-package-path">Encrypted package destination (.nqx)</label>
+          <div class="path-row">
+            <input id="share-package-path" required placeholder="/path/shared-file.nqx">
+            <button id="share-package-picker" class="picker" type="button" aria-label="Choose encrypted package destination">Browse</button>
+          </div>
+          <button class="secondary" type="submit">Create encrypted package</button>
+        </form>
+
+        <form id="open-shared-form" class="operation">
+          <h4>Open a received package</h4>
+          <p>Only a matching receiving key can decrypt the package. Successful decryption does not verify who sent it.</p>
+          <label for="shared-package-input">Received package (.nqx)</label>
+          <div class="path-row">
+            <input id="shared-package-input" required placeholder="/path/shared-file.nqx">
+            <button id="shared-package-input-picker" class="picker" type="button" aria-label="Select received package">Browse</button>
+          </div>
+          <label for="receiving-identity-select">Receiving identity</label>
+          <select id="receiving-identity-select" required><option value="">Create a receiving identity first</option></select>
+          <label for="shared-output-path">Recovered file destination</label>
+          <div class="path-row">
+            <input id="shared-output-path" required placeholder="/path/recovered-file">
+            <button id="shared-output-picker" class="picker" type="button" aria-label="Choose recovered file destination">Browse</button>
+          </div>
+          <button class="secondary" type="submit">Decrypt and recover file</button>
+        </form>
+
         <form id="encrypt-folder-form" class="operation">
           <h4>Cifrar carpeta</h4><p>Los nombres y las rutas se guardan en un manifiesto cifrado. No modifica los originales.</p>
           <label for="encrypt-folder-source">Carpeta original</label>
@@ -231,6 +300,7 @@
         <article class="guide-card"><span>04</span><h4>Make a vault-key backup</h4><p>The encrypted .nqb stores vault/key state only. It excludes .nqx files, folder manifests and encrypted folder objects. Keep all encrypted documents separately and store the backup passphrase away from the .nqb file.</p></article>
         <article class="guide-card"><span>05</span><h4>Restore keys and documents</h4><p>Import the .nqb with its separate backup passphrase and create a new vault with a new vault password. The restored keys are then used to decrypt your separately preserved .nqx files and restore your encrypted folder data. This does not reveal or reset the original vault password.</p></article>
         <article class="guide-card"><span>06</span><h4>Important limitations</h4><p>Folder encryption currently supports files up to 32 MiB, skips empty folders and rejects symbolic links. This early-access release has not been independently audited.</p></article>
+        <article class="guide-card"><span data-number="07" aria-hidden="true"></span><h4>Share files with a recipient</h4><p>Create a receiving identity, export its public .nqcontact card and verify the full fingerprint with the recipient through a separate trusted channel. Share the .nqx package through any channel. Decryption does not authenticate the sender; keep a separate .nqb backup of your receiving keys.</p></article>
       </div>
     </section>
     <footer><span>NEXUS-Q Vault · Local-first · No telemetry</span><span>Made for privacy</span></footer>

@@ -34,3 +34,5 @@ body.dark{background:#101010;color:#eee;--muted:#999;--line:#303030;--surface:#1
   white-space: nowrap;
   border: 0;
 }
+
+.backup-check{display:flex;align-items:flex-start;gap:8px;line-height:1.5}.backup-check input{width:auto;flex:none;margin:2px 0 0}.guide-card span[data-number]::before{content:attr(data-number)}

@@ -32,7 +32,7 @@ jobs:
       - name: Check out pinned nexus-q engine
         run: |
           git clone --filter=blob:none --no-checkout https://github.com/lecodev-26/nexus-q.git ../nexus-q
-          git -C ../nexus-q checkout cd09838d266c66f4ac8a172ca8d239dae87a799f
+          git -C ../nexus-q checkout 458fc393992f4b8030ff594a408620058032e214
 
       - name: Check frontend password confirmation flows
         run: node --test apps/desktop/ui/password-confirmation.test.js
@@ -45,6 +45,9 @@ jobs:
 
       - name: Run tests
         run: cargo test --locked
+
+      - name: Run desktop application tests (including Windows hardening tests)
+        run: cargo test --manifest-path apps/desktop/Cargo.toml --locked --bin nexus-q-vault-desktop
 
   desktop:
     name: Desktop build (${{ matrix.os }})
@@ -65,7 +68,7 @@ jobs:
       - name: Check out pinned nexus-q engine
         run: |
           git clone --filter=blob:none --no-checkout https://github.com/lecodev-26/nexus-q.git ../nexus-q
-          git -C ../nexus-q checkout cd09838d266c66f4ac8a172ca8d239dae87a799f
+          git -C ../nexus-q checkout 458fc393992f4b8030ff594a408620058032e214
 
       - name: Check desktop formatting
         run: cargo fmt --manifest-path apps/desktop/Cargo.toml -- --check
