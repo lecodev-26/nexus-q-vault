@@ -6,30 +6,35 @@ const locales = path.join(__dirname, '..', 'locales');
 const en = require(path.join(locales, 'en.json'));
 const es = require(path.join(locales, 'es.json'));
 const ca = require(path.join(locales, 'ca.json'));
+const fr = require(path.join(locales, 'fr.json'));
 const manifest = require(path.join(locales, 'manifest.json'));
 test('manifest registers every locale dictionary', () => {
-  assert.deepEqual(Object.keys(manifest).sort(), ['ca', 'en', 'es']);
+  assert.deepEqual(Object.keys(manifest).sort(), ['ca', 'en', 'es', 'fr']);
   for (const code of Object.keys(manifest)) assert.ok(fs.existsSync(path.join(locales, `${code}.json`)));
 });
 test('English and Spanish dictionaries have identical keys', () => {
   assert.deepEqual(Object.keys(es).sort(), Object.keys(en).sort());
 });
-test('Catalan dictionary has complete English key coverage', () => {
+test('Catalan and French dictionaries have complete English key coverage', () => {
   assert.deepEqual(Object.keys(ca).sort(), Object.keys(en).sort());
+  assert.deepEqual(Object.keys(fr).sort(), Object.keys(en).sort());
 });
-test('every Catalan entry maps to a known English key and has a value', () => {
-  for (const [key, value] of Object.entries(ca)) {
-    assert.ok(Object.hasOwn(en, key), `Unknown Catalan key: ${key}`);
-    assert.equal(typeof value, 'string');
-    assert.ok(value.trim().length > 0, `Empty Catalan value: ${key}`);
+test('every Catalan and French entry maps to a known English key and has a value', () => {
+  for (const [locale, dictionary] of Object.entries({ ca, fr })) {
+    for (const [key, value] of Object.entries(dictionary)) {
+      assert.ok(Object.hasOwn(en, key), `Unknown ${locale} key: ${key}`);
+      assert.equal(typeof value, 'string');
+      assert.ok(value.trim().length > 0, `Empty ${locale} value: ${key}`);
+    }
   }
 });
 test('all locale files are valid JSON', () => {
-  for (const file of ['manifest.json', 'en.json', 'es.json', 'ca.json']) assert.doesNotThrow(() => JSON.parse(fs.readFileSync(path.join(locales, file), 'utf8')));
+  for (const file of ['manifest.json', 'en.json', 'es.json', 'ca.json', 'fr.json']) assert.doesNotThrow(() => JSON.parse(fs.readFileSync(path.join(locales, file), 'utf8')));
 });
-test('Catalan values are translated rather than silently copied from English', () => {
+test('Catalan and French values are translated rather than silently copied from English', () => {
   for (const key of Object.keys(en)) {
     assert.notEqual(ca[key], en[key], `Missing Catalan translation: ${key}`);
+    assert.notEqual(fr[key], en[key], `Missing French translation: ${key}`);
   }
 });
 test('the application uses the shared locale runtime instead of language ternaries', () => {
@@ -64,6 +69,12 @@ test('locale runtime loads Catalan and translates backend error prefixes', async
   assert.equal(
     window.NexusQI18n.translateValue('No se pudo crear el vault: storage error'),
     'No s’ha pogut crear la caixa forta: storage error',
+  );
+  await window.NexusQI18n.setLanguage('fr');
+  assert.equal(window.NexusQI18n.t('Create a vault'), fr['Create a vault']);
+  assert.equal(
+    window.NexusQI18n.translateValue('No se pudo crear el vault: storage error'),
+    'Impossible de créer le coffre : storage error',
   );
 });
 
