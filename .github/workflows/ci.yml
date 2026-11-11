@@ -37,6 +37,9 @@ jobs:
       - name: Check frontend password confirmation flows
         run: node --test apps/desktop/ui/password-confirmation.test.js
 
+      - name: Check desktop localization dictionaries and runtime
+        run: node --test apps/desktop/ui/i18n/i18n.test.js
+
       - name: Check formatting
         run: cargo fmt --all -- --check
 
