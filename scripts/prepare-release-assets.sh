@@ -27,7 +27,9 @@ copy_matches() {
     exit 1
   fi
   for file in "${files[@]}"; do
-    local target="$OUTPUT_DIR/$(basename "$file")"
+    local asset_name
+    asset_name="$(basename "$file" | tr ' ' '.')"
+    local target="$OUTPUT_DIR/$asset_name"
     if [[ -e "$target" ]]; then
       echo "ERROR: duplicate asset filename: $(basename "$file")" >&2
       exit 1
