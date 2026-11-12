@@ -112,4 +112,13 @@ test('Portuguese variants preserve technical placeholders and regional wording',
     assert.deepEqual(placeholders(ptBR[key]), placeholders(en[key]), `pt-BR placeholders changed: ${key}`);
   }
   assert.notEqual(ptPT['Password'], ptBR['Password']);
+  assert.equal(ptPT['Save a backup'], 'Guardar uma cópia de segurança');
+  assert.equal(ptPT['Receiving identity'], 'Identidade recetora');
+  assert.equal(ptPT['Running'], 'Em execução');
+  assert.equal(ptBR['Receiving identity'], 'Identidade de recebimento');
+  assert.equal(ptBR['Running'], 'Em execução');
+  assert.match(ptPT['Password'], /palavra-passe/i);
+  assert.equal(ptBR['Password'], 'Senha');
+  for (const [key, value] of Object.entries(ptPT)) assert.doesNotMatch(value, /\b(?:gerenciador|Salve-o|sotaque)\b/i, 'Brazilian wording in pt-PT: ' + key);
+  for (const [key, value] of Object.entries(ptBR)) assert.doesNotMatch(value, /\b(?:ficheiro|palavra-passe)\b/i, 'European wording in pt-BR: ' + key);
 });
