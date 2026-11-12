@@ -24,7 +24,7 @@
   <a href="https://github.com/lecodev-26/nexus-q-vault/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/lecodev-26/nexus-q-vault"></a>
 </p>
 
-> **Public release — v0.1.0 (early access).** This project has not received an independent security audit. Do not use it as the only copy of important data or as the sole protection for high-value information. Read the [security limitations](#security-status-and-limitations) before use.
+> **v0.2.0 release preparation (not yet published).** The latest public release remains v0.1.0 until a v0.2.0 tag and release are explicitly authorized. This project has not received an independent security audit. Do not use it as the only copy of important data or as the sole protection for high-value information. Read the [security limitations](#security-status-and-limitations) before use.
 
 NEXUS-Q Vault is an open-source desktop application for protecting local files. It is designed around a simple idea: encryption and vault data should stay on the computer you control, without requiring a cloud account or a hosted service.
 
@@ -36,7 +36,10 @@ NEXUS-Q Vault is an open-source desktop application for protecting local files. 
 - **Recovery backup:** export an encrypted `.nqb` backup of vault/key state and restore it into a new vault with new credentials.
 - **No automatic source deletion:** original files are kept; encryption does not silently remove them.
 - **One cryptographic boundary:** cryptographic operations are delegated to the Rust `nexusq-core` engine.
-- **Desktop experience:** Tauri 2 interface for Linux, Windows and macOS, with light/dark themes and English/Spanish UI.
+- **Desktop experience:** Tauri 2 interface for Linux, Windows and macOS, with light/dark themes and seven UI languages: English, Spanish, Catalan, French, German, Portuguese (Portugal) and Portuguese (Brazil).
+- **Automatic locking:** configurable inactivity locking and system-event handling, with recovery behavior when a lock attempt fails.
+- **Operations center:** cancellable long-running vault operations with visible progress and status.
+- **Encrypted sharing:** recipient-encrypted file packages with hardened temporary-file handling.
 
 ## Screenshots
 
@@ -74,17 +77,25 @@ A `.nqb` recovery backup contains vault/key state. It does **not** include your 
 
 The backup passphrase is separate from the vault password. A backup restores vault/key state; it does not reveal or reset the original vault password.
 
+### Recipient-encrypted file exchange
+
+To receive a shared file, create a receiving identity and export its public `.nqcontact` card. Verify the complete fingerprint with the other person through a separate trusted channel before sharing the card. The sender can then encrypt a file package for that recipient and transfer the `.nqx` package over any channel. **Recipient encryption does not authenticate the sender**; it protects the package for the selected receiving identity. Keep a separate `.nqb` backup of the receiving keys.
+
 ## Current capabilities
 
-| Area | Available in v0.1.0 |
+| Area | Available in v0.2.0 release candidate |
 |---|---|
 | Vault lifecycle | Create, open, unlock and lock a local vault |
 | Individual files | Encrypt to `.nqx`; decrypt to a new destination |
 | Folders | Encrypt to an authenticated manifest plus opaque encrypted objects; restore to a new destination |
 | Recovery | Export/import an encrypted `.nqb` vault/key backup |
 | Password UX | Password generator and show/hide controls |
-| Desktop UI | Separate navigation pages, English/Spanish labels, light/dark mode |
+| Desktop UI | Separate navigation pages, seven languages, light/dark mode |
 | Data collection | No application telemetry is implemented |
+| Automatic locking | Configurable inactivity lock and system-event lock handling |
+| Operations | Cancellable operations center for supported long-running tasks |
+| Sharing | Recipient-encrypted file exchange packages |
+| Localization | English, Spanish, Catalan, French, German, Portuguese (Portugal), Portuguese (Brazil) |
 
 ## Security status and limitations
 
@@ -106,7 +117,7 @@ See [PRODUCT.md](PRODUCT.md), [THREAT_MODEL.md](THREAT_MODEL.md), [SECURITY.md](
 
 ## Download
 
-The public v0.1.0 installers are published on the [GitHub Releases page](https://github.com/lecodev-26/nexus-q-vault/releases).
+The public v0.1.0 installers remain available on the [GitHub Releases page](https://github.com/lecodev-26/nexus-q-vault/releases). v0.2.0 is being prepared; its installers will be added only after the release candidate passes validation and publication is authorized.
 
 | Platform | Release artifact |
 |---|---|
@@ -130,7 +141,7 @@ The desktop crate uses a local path dependency on `../nexus-q`. From the Vault r
 
 ```sh
 git clone https://github.com/lecodev-26/nexus-q.git ../nexus-q
-git -C ../nexus-q checkout efe486603af266c379131526d8320a0584254ce4
+git -C ../nexus-q checkout 458fc393992f4b8030ff594a408620058032e214
 
 cargo run --locked --manifest-path apps/desktop/Cargo.toml
 ```
@@ -153,14 +164,14 @@ cd apps/desktop
 cargo tauri build
 ```
 
-GitHub Actions validates the project and builds the Windows and macOS installers. Linux `.deb` and `.AppImage` installers are built on the project's Zorin OS 18.1 machine and uploaded to the same GitHub Release; the release checksums are regenerated to cover every platform artifact.
+GitHub Actions validates the project and builds the Windows and macOS installers. Linux `.deb` and `.AppImage` installers are built on the project's Zorin OS 18.1 machine. The release checklist and `scripts/prepare-release-assets.sh` require all five installer formats and matching build metadata before generating the final cross-platform checksums. The v0.2.0 release workflow can be dispatched manually to build Windows/macOS candidates without publishing a release; Linux remains a separately verified host build.
 
 ## Architecture
 
 - **Desktop shell:** Tauri 2.
 - **Application and filesystem boundary:** Rust commands in `apps/desktop/src/main.rs`.
 - **User interface:** HTML, CSS and JavaScript in `apps/desktop/ui/`.
-- **Cryptography:** `nexusq-core` from the [NEXUS-Q engine repository](https://github.com/lecodev-26/nexus-q), pinned in CI/release builds to commit `efe486603af266c379131526d8320a0584254ce4`.
+- **Cryptography:** `nexusq-core` from the [NEXUS-Q engine repository](https://github.com/lecodev-26/nexus-q), pinned in CI/release builds to commit `458fc393992f4b8030ff594a408620058032e214`.
 - **Folder adapter:** versioned authenticated manifest and opaque encrypted objects; see [FOLDER_FORMAT_V1.md](docs/FOLDER_FORMAT_V1.md).
 
 Vault does not implement a parallel cryptographic engine, custom key derivation or an independent encryption format.
@@ -168,6 +179,8 @@ Vault does not implement a parallel cryptographic engine, custom key derivation 
 ## Project documentation
 
 - [Product scope and MVP](PRODUCT.md)
+- [Changelog](CHANGELOG.md)
+- [v0.2.0 release checklist](docs/RELEASE_CHECKLIST_v0.2.0.md)
 - [Threat model](THREAT_MODEL.md)
 - [Security policy and vulnerability reporting](SECURITY.md)
 - [Architecture decisions](docs/DECISIONS.md)

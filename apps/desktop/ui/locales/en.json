@@ -116,7 +116,6 @@
   "Dark mode": "Dark mode",
   "PREFERENCES": "PREFERENCES",
   "Settings & profile": "Settings & profile",
-  "Public release · v0.1.0": "Public release · v0.1.0",
   "Local profile": "Local profile",
   "Your profile stays on this device and is not uploaded.": "Your profile stays on this device and is not uploaded.",
   "Display name": "Display name",
@@ -135,7 +134,6 @@
   "Application": "Application",
   "Build information and important limitations.": "Build information and important limitations.",
   "Version": "Version",
-  "0.1.0 · Public release": "0.1.0 · Public release",
   "Data location": "Data location",
   "On this device": "On this device",
   "Telemetry": "Telemetry",
@@ -353,5 +351,7 @@
   "Retired": "Retired",
   "Rotating": "Rotating",
   "Share files with a recipient": "Share files with a recipient",
-  "Create a receiving identity, export its public .nqcontact card and verify the full fingerprint with the recipient through a separate trusted channel. Share the .nqx package through any channel. Decryption does not authenticate the sender; keep a separate .nqb backup of your receiving keys.": "Create a receiving identity, export its public .nqcontact card and verify the full fingerprint with the recipient through a separate trusted channel. Share the .nqx package through any channel. Decryption does not authenticate the sender; keep a separate .nqb backup of your receiving keys."
+  "Create a receiving identity, export its public .nqcontact card and verify the full fingerprint with the recipient through a separate trusted channel. Share the .nqx package through any channel. Decryption does not authenticate the sender; keep a separate .nqb backup of your receiving keys.": "Create a receiving identity, export its public .nqcontact card and verify the full fingerprint with the recipient through a separate trusted channel. Share the .nqx package through any channel. Decryption does not authenticate the sender; keep a separate .nqb backup of your receiving keys.",
+  "Version · v0.2.0": "Version · v0.2.0",
+  "v0.2.0 · Early access": "v0.2.0 · Early access"
 }

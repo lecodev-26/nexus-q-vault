@@ -1,7 +1,7 @@
 # Security Policy
 
 ## Status
-NEXUS-Q Vault v0.1.0 is an early-access public release, not a security-audited or production-hardened product. It has not received an independent security audit. Do not rely on it as the sole protection for high-value or irreplaceable data.
+NEXUS-Q Vault is an early-access project, not a security-audited or production-hardened product. It has not received an independent security audit. Do not rely on it as the sole protection for high-value or irreplaceable data.
 
 ## Reporting a vulnerability
 Do not publish exploitable details in public issues. Until a dedicated private advisory channel and response team are established, contact maintainers through the private vulnerability reporting feature of the repository host (GitHub Security Advisories, when enabled). If unavailable, request a private contact route without including exploit details in a public message.

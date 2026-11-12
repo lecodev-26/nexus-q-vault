@@ -119,7 +119,6 @@
   "Display name": "Nome de exibição",
   "Profile photo": "Foto de perfil",
   "View NEXUS-Q repository ↗": "Ver repositório NEXUS-Q ↗",
-  "Public release · v0.1.0": "Lançamento público · v0.1.0",
   "Save profile": "Guardar perfil",
   "Appearance": "Aspeto",
   "Accent color": "Cor de destaque",
@@ -140,7 +139,6 @@
   "Build information and important limitations.": "Informações da versão e limitações importantes.",
   "This early-access release has not been independently audited. Keep separate backups of encrypted payloads and recovery material.": "Esta versão de acesso antecipado não foi auditada de forma independente. Mantenha cópias de segurança separadas dos dados encriptados e do material de recuperação.",
   "The default palette is monochrome. Your accent and font choices are saved locally.": "A paleta predefinida é monocromática. As suas escolhas de cor de destaque e tipo de letra são guardadas localmente.",
-  "0.1.0 · Public release": "0.1.0 · Lançamento público",
   "Choose a location, create a strong unique password and keep it safe. The vault file stores your protected key material.": "Escolha uma localização, crie uma palavra-passe forte e única e guarde-a em segurança. O ficheiro do cofre armazena o material criptográfico protegido.",
   "Help & user guide": "Ajuda e guia do utilizador",
   "Data location": "Localização dos dados",
@@ -353,5 +351,7 @@
   "Source file → recipient-encrypted .nqx package": "Ficheiro de origem → pacote .nqx encriptado pelo destinatário",
   "Encrypted .nqx package → recovered file": "Pacote .nqx encriptado → ficheiro recuperado",
   "Share files with a recipient": "Partilhe ficheiros com um destinatário",
-  "Create a receiving identity, export its public .nqcontact card and verify the full fingerprint with the recipient through a separate trusted channel. Share the .nqx package through any channel. Decryption does not authenticate the sender; keep a separate .nqb backup of your receiving keys.": "Crie uma identidade recetora, exporte o respetivo cartão público .nqcontact e confirme a impressão digital completa com o destinatário através de um canal fidedigno separado. Partilhe o pacote .nqx através de qualquer canal. A desencriptação não autentica o remetente; mantenha uma cópia de segurança .nqb separada das chaves da identidade recetora."
+  "Create a receiving identity, export its public .nqcontact card and verify the full fingerprint with the recipient through a separate trusted channel. Share the .nqx package through any channel. Decryption does not authenticate the sender; keep a separate .nqb backup of your receiving keys.": "Crie uma identidade recetora, exporte o respetivo cartão público .nqcontact e confirme a impressão digital completa com o destinatário através de um canal fidedigno separado. Partilhe o pacote .nqx através de qualquer canal. A desencriptação não autentica o remetente; mantenha uma cópia de segurança .nqb separada das chaves da identidade recetora.",
+  "Version · v0.2.0": "Versão · v0.2.0",
+  "v0.2.0 · Early access": "v0.2.0 · Acesso antecipado"
 }

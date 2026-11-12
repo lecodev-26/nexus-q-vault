@@ -116,7 +116,6 @@
   "Dark mode": "Modo oscuro",
   "PREFERENCES": "PREFERENCIAS",
   "Settings & profile": "Ajustes y perfil",
-  "Public release · v0.1.0": "Lanzamiento público · v0.1.0",
   "Local profile": "Perfil local",
   "Your profile stays on this device and is not uploaded.": "Tu perfil permanece en este dispositivo y no se sube a ningún servidor.",
   "Display name": "Nombre visible",
@@ -135,7 +134,6 @@
   "Application": "Aplicación",
   "Build information and important limitations.": "Información de versión y limitaciones importantes.",
   "Version": "Versión",
-  "0.1.0 · Public release": "0.1.0 · Lanzamiento público",
   "Data location": "Ubicación de los datos",
   "On this device": "En este dispositivo",
   "Telemetry": "Telemetría",
@@ -353,5 +351,7 @@
   "Retired": "Retirada",
   "Rotating": "En rotación",
   "Share files with a recipient": "Compartir archivos con un destinatario",
-  "Create a receiving identity, export its public .nqcontact card and verify the full fingerprint with the recipient through a separate trusted channel. Share the .nqx package through any channel. Decryption does not authenticate the sender; keep a separate .nqb backup of your receiving keys.": "Crea una identidad receptora, exporta su tarjeta pública .nqcontact y verifica la huella completa con el destinatario mediante un canal de confianza independiente. Comparte el paquete .nqx por cualquier canal. El descifrado no autentica al remitente; conserva un backup .nqb separado de tus claves receptoras."
+  "Create a receiving identity, export its public .nqcontact card and verify the full fingerprint with the recipient through a separate trusted channel. Share the .nqx package through any channel. Decryption does not authenticate the sender; keep a separate .nqb backup of your receiving keys.": "Crea una identidad receptora, exporta su tarjeta pública .nqcontact y verifica la huella completa con el destinatario mediante un canal de confianza independiente. Comparte el paquete .nqx por cualquier canal. El descifrado no autentica al remitente; conserva un backup .nqb separado de tus claves receptoras.",
+  "Version · v0.2.0": "Versión · v0.2.0",
+  "v0.2.0 · Early access": "v0.2.0 · Acceso anticipado"
 }

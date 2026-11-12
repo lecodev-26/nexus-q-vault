@@ -101,7 +101,6 @@
   "Dark mode": "Mode fosc",
   "PREFERENCES": "PREFERÈNCIES",
   "Settings & profile": "Configuració i perfil",
-  "Public release · v0.1.0": "Versió pública · v0.1.0",
   "Local profile": "Perfil local",
   "Your profile stays on this device and is not uploaded.": "El teu perfil es manté en aquest dispositiu i no es puja a cap servidor.",
   "Display name": "Nom visible",
@@ -196,7 +195,6 @@
   "Make Vault feel like your workspace.": "Adapta Vault al teu espai de treball.",
   "The default palette is monochrome. Your accent and font choices are saved locally.": "La paleta predeterminada és monocroma. Les opcions de color d’accent i de tipografia es desen localment.",
   "Build information and important limitations.": "Informació de la versió i limitacions importants.",
-  "0.1.0 · Public release": "0.1.0 · Versió pública",
   "This early-access release has not been independently audited. Keep separate backups of encrypted payloads and recovery material.": "Aquesta versió d’accés anticipat no ha estat auditada de manera independent. Conserva còpies separades de les dades xifrades i del material de recuperació.",
   "Store your password in a password manager. An encrypted recovery backup can restore vault keys, but it cannot reveal your original password.": "Desa la contrasenya en un gestor de contrasenyes. Una còpia de recuperació xifrada pot restaurar les claus de la caixa forta, però no pot revelar la contrasenya original.",
   "Lock the vault after a period without keyboard or pointer activity. This setting stays on this device.": "Bloqueja la caixa forta després d’un període sense activitat del teclat ni del ratolí. Aquest ajust es desa en aquest dispositiu.",
@@ -353,5 +351,7 @@
   "Retired": "Retirada",
   "Rotating": "En rotació",
   "Share files with a recipient": "Comparteix fitxers amb un destinatari",
-  "Create a receiving identity, export its public .nqcontact card and verify the full fingerprint with the recipient through a separate trusted channel. Share the .nqx package through any channel. Decryption does not authenticate the sender; keep a separate .nqb backup of your receiving keys.": "Crea una identitat receptora, exporta’n la targeta pública .nqcontact i verifica’n l’empremta completa amb el destinatari mitjançant un canal de confiança independent. Comparteix el paquet .nqx per qualsevol canal. El desxifrat no autentica el remitent; conserva una còpia .nqb separada de les claus receptores."
+  "Create a receiving identity, export its public .nqcontact card and verify the full fingerprint with the recipient through a separate trusted channel. Share the .nqx package through any channel. Decryption does not authenticate the sender; keep a separate .nqb backup of your receiving keys.": "Crea una identitat receptora, exporta’n la targeta pública .nqcontact i verifica’n l’empremta completa amb el destinatari mitjançant un canal de confiança independent. Comparteix el paquet .nqx per qualsevol canal. El desxifrat no autentica el remitent; conserva una còpia .nqb separada de les claus receptores.",
+  "Version · v0.2.0": "Versió · v0.2.0",
+  "v0.2.0 · Early access": "v0.2.0 · Accés anticipat"
 }
