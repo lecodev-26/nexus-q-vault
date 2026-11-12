@@ -195,6 +195,6 @@ jobs:
             - Folder encryption currently has a 32 MiB per-file limit and does not preserve empty directories or symbolic links.
 
             **Full changelog**: https://github.com/lecodev-26/nexus-q-vault/blob/main/CHANGELOG.md
-          files: release-assets/*
+          files: release-assets-flat/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
