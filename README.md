@@ -77,6 +77,10 @@ A `.nqb` recovery backup contains vault/key state. It does **not** include your 
 
 The backup passphrase is separate from the vault password. A backup restores vault/key state; it does not reveal or reset the original vault password.
 
+### Recipient-encrypted file exchange
+
+To receive a shared file, create a receiving identity and export its public `.nqcontact` card. Verify the complete fingerprint with the other person through a separate trusted channel before sharing the card. The sender can then encrypt a file package for that recipient and transfer the `.nqx` package over any channel. **Recipient encryption does not authenticate the sender**; it protects the package for the selected receiving identity. Keep a separate `.nqb` backup of the receiving keys.
+
 ## Current capabilities
 
 | Area | Available in v0.2.0 release candidate |

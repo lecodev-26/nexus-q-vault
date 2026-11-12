@@ -27,6 +27,7 @@ All notable changes to NEXUS-Q Vault are documented here.
 ### Security and compatibility notes
 - This remains early-access software and has not received an independent security audit.
 - Encrypted file payloads and folder-vault objects remain separate from `.nqb` vault/key recovery backups and must be backed up independently.
+- Recipient-encrypted file exchange does not authenticate the sender; verify recipient fingerprints through a separate trusted channel and keep a separate `.nqb` backup of receiving keys.
 - Existing folder-format limitations remain; see `README.md`, `THREAT_MODEL.md` and `docs/FOLDER_FORMAT_V1.md`.
 - No tag or public release has been created for v0.2.0.
 

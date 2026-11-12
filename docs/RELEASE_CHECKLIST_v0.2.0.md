@@ -18,6 +18,7 @@
 - [ ] Run root Rust checks with the pinned sibling Core checkout available: `cargo fmt --all -- --check`, `cargo clippy --locked --all-targets -- -D warnings`, `cargo test --locked`.
 - [ ] Run desktop Rust checks: `cargo fmt --manifest-path apps/desktop/Cargo.toml -- --check`, `cargo clippy --manifest-path apps/desktop/Cargo.toml --locked --all-targets -- -D warnings`, `cargo test --manifest-path apps/desktop/Cargo.toml --locked --bin nexus-q-vault-desktop`.
 - [ ] Run frontend tests: `node --test apps/desktop/ui/i18n/i18n.test.js apps/desktop/ui/password-confirmation.test.js`.
+- [ ] Review the recipient-sharing warning: recipient encryption protects the receiving identity but does not authenticate the sender; fingerprint verification must use a separate trusted channel.
 - [ ] Run release workflow manually and inspect Windows MSI/NSIS and macOS DMG candidate artifacts.
 - [ ] Build Linux `.deb` and `.AppImage` on the project's Zorin OS 18.1 build host from the exact same Vault commit and pinned Core revision.
 - [ ] Smoke-test installers and application startup on Windows, macOS and Linux. Compilation alone is not an installer/runtime smoke test.
