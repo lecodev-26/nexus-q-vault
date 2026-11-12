@@ -1,7 +1,9 @@
 {
+  "ca": "Català",
+  "de": "Deutsch",
   "en": "English",
   "es": "Español",
-  "ca": "Català",
   "fr": "Français",
-  "de": "Deutsch"
+  "pt-BR": "Português (Brasil)",
+  "pt-PT": "Português (Portugal)"
 }

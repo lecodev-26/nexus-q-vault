@@ -7,6 +7,8 @@ The desktop UI keeps its locale dictionaries in this directory:
 - `ca.json` contains the Catalan values for those same keys.
 - `fr.json` contains the French values for those same keys.
 - `de.json` contains the German values for those same keys.
+- `pt-PT.json` contains the European Portuguese values for those same keys.
+- `pt-BR.json` contains the Brazilian Portuguese values for those same keys.
 
 The shared runtime is `../i18n/index.js`. It loads the dictionaries, remembers the selected language through the app's existing local preference, and translates static text, placeholders, titles and accessible labels. Dynamic UI messages should use `NexusQI18n.t("English source string")` rather than language-specific conditionals.
 
