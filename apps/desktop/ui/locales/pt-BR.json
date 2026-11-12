@@ -116,7 +116,6 @@
   "Dark mode": "Modo escuro",
   "PREFERENCES": "PREFERÊNCIAS",
   "Settings & profile": "Configurações e perfil",
-  "Public release · v0.1.0": "Lançamento público · v0.1.0",
   "Local profile": "Perfil local",
   "Display name": "Nome de exibição",
   "Your profile stays on this device and is not uploaded.": "Seu perfil permanece neste dispositivo e não é carregado.",
@@ -134,7 +133,6 @@
   "Apply appearance": "Aplicar aparência",
   "Application": "Aplicativo",
   "Build information and important limitations.": "Informações da versão e limitações importantes.",
-  "0.1.0 · Public release": "0.1.0 · Lançamento público",
   "Version": "Versão",
   "On this device": "Neste dispositivo",
   "Disabled": "Desabilitado",
@@ -353,5 +351,7 @@
   "Rotating": "Em rotação",
   "Create a receiving identity, export its public .nqcontact card and verify the full fingerprint with the recipient through a separate trusted channel. Share the .nqx package through any channel. Decryption does not authenticate the sender; keep a separate .nqb backup of your receiving keys.": "Crie uma identidade de recebimento, exporte seu cartão público .nqcontact e confirme a impressão digital completa com o destinatário por um canal confiável separado. Compartilhe o pacote .nqx por qualquer canal. A descriptografia não autentica o remetente; mantenha um backup .nqb separado das chaves da identidade de recebimento.",
   "Choose contact card destination": "Escolha o destino do cartão de contato",
-  "Share an encrypted file": "Compartilhe um arquivo criptografado"
+  "Share an encrypted file": "Compartilhe um arquivo criptografado",
+  "Version · v0.2.0": "Versão · v0.2.0",
+  "v0.2.0 · Early access": "v0.2.0 · Acesso antecipado"
 }

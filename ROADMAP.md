@@ -17,11 +17,15 @@
   - [x] Native file/folder pickers through Tauri's cross-platform dialog plugin.
   - [x] Initial accessibility pass: semantic status/errors, labelled picker controls, busy states, keyboard focus and reduced-motion support.
   - [x] Password visibility controls; visibility resets when forms clear secrets or the vault is locked.
+  - [x] Configurable automatic inactivity/system-event locking and recovery-safe lock failure handling (PRs #25–#26).
+  - [x] Cancellable operations center (PR #27).
+  - [x] Recipient-encrypted file exchange with file-handling hardening (PRs #29–#30).
   - [ ] User testing, onboarding polish and full accessibility review.
 - [ ] Internationalization and community translations.
-  - [ ] Establish a maintainable localization structure, language selection and English fallback.
-  - [ ] Add Catalan (ca) alongside the existing English and Spanish interface.
-  - [ ] Add French (fr), German (de), Portuguese (pt) and Italian (it) in subsequent releases.
+  - [x] Establish a maintainable localization structure, language selection and English fallback.
+  - [x] Add Catalan (ca) alongside the existing English and Spanish interface (PR #28).
+  - [x] Add French (fr), German (de), Portuguese (Portugal, pt-PT) and Portuguese (Brazil, pt-BR) (PRs #31–#33).
+  - [ ] Add Italian (it) after a reviewed translation is available.
   - [ ] Expand to Japanese (ja), Korean (ko), Simplified Chinese (zh-CN) and Traditional Chinese (zh-TW).
   - [ ] Add Arabic (ar), Hindi (hi), Indonesian (id), Turkish (tr), Russian (ru) and other community-requested languages.
   - [ ] Establish translation review guidance so contributed translations are checked for accuracy, consistency, accessibility and security-sensitive terminology.

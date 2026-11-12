@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -23,15 +24,23 @@ jobs:
       - name: Check out NEXUS-Q Vault
         uses: actions/checkout@v5
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
 
+      - name: Run frontend tests
+        run: node --test apps/desktop/ui/i18n/i18n.test.js apps/desktop/ui/password-confirmation.test.js
+
       - name: Check out pinned NEXUS-Q cryptographic engine
         run: |
           git clone --filter=blob:none --no-checkout https://github.com/lecodev-26/nexus-q.git ../nexus-q
-          git -C ../nexus-q checkout cd09838d266c66f4ac8a172ca8d239dae87a799f
+          git -C ../nexus-q checkout 458fc393992f4b8030ff594a408620058032e214
 
       - name: Check formatting
         run: |
@@ -45,6 +54,9 @@ jobs:
 
       - name: Run tests
         run: cargo test --locked
+
+      - name: Run desktop application tests
+        run: cargo test --manifest-path apps/desktop/Cargo.toml --locked --bin nexus-q-vault-desktop
 
       - name: Verify desktop dependency lockfile
         run: cargo metadata --locked --manifest-path apps/desktop/Cargo.toml --format-version 1 > /dev/null
@@ -70,6 +82,9 @@ jobs:
             artifact_path: apps/desktop/target/release/bundle/dmg/*.dmg
 
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
 
     steps:
       - name: Check out NEXUS-Q Vault
@@ -82,7 +97,7 @@ jobs:
         shell: bash
         run: |
           git clone --filter=blob:none --no-checkout https://github.com/lecodev-26/nexus-q.git ../nexus-q
-          git -C ../nexus-q checkout cd09838d266c66f4ac8a172ca8d239dae87a799f
+          git -C ../nexus-q checkout 458fc393992f4b8030ff594a408620058032e214
 
       - name: Install Tauri CLI
         run: cargo install tauri-cli --version '^2.0.0' --locked
@@ -95,16 +110,25 @@ jobs:
         working-directory: apps/desktop
         run: cargo tauri build --bundles ${{ matrix.bundles }}
 
+      - name: Write build metadata
+        run: |
+          mkdir -p release-assets
+          VERSION=$(grep -m1 '"version"' apps/desktop/tauri.conf.json | sed -E 's/.*"version": "([^"]+)".*/\1/')
+          printf "version=%s\ncommit=%s\nplatform=%s\n" "$VERSION" "$GITHUB_SHA" "${{ matrix.platform }}" > "release-assets/BUILD-INFO-${{ matrix.platform }}.txt"
+
       - name: Upload installer artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
-          path: ${{ matrix.artifact_path }}
+          path: |
+            ${{ matrix.artifact_path }}
+            release-assets/BUILD-INFO-${{ matrix.platform }}.txt
           if-no-files-found: error
           compression-level: 0
 
   publish:
-    name: Publish GitHub Release
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    name: Create draft GitHub Release
     needs: build
     runs-on: windows-latest
     defaults:
@@ -124,20 +148,16 @@ jobs:
           find release-assets -mindepth 2 -type f -exec mv -t release-assets -- {} +
           find release-assets -mindepth 1 -type d -empty -delete
 
-      - name: Generate SHA-256 checksums
-        run: |
-          cd release-assets
-          find . -maxdepth 1 -type f ! -name SHA256SUMS.txt -print0 | sort -z | xargs -0 -r sha256sum > SHA256SUMS.txt
-
-      - name: Publish public release and attach installers
+      - name: Create draft release and attach candidate installers
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          name: NEXUS-Q Vault v0.1.0
+          name: NEXUS-Q Vault ${{ github.ref_name }}
+          draft: true
           prerelease: false
           generate_release_notes: true
           body: |
-            **NEXUS-Q Vault v0.1.0 — first public release (early access).**
+            **NEXUS-Q Vault ${{ github.ref_name }} — early access.**
 
             This is an early-access release, not a security-audited or production-hardened product. It has not received an independent security audit and should not be the sole protection for high-value or irreplaceable data. Review README.md, SECURITY.md and THREAT_MODEL.md before use.
 
@@ -146,10 +166,10 @@ jobs:
             - Windows: `.msi` and `.exe`
             - macOS: `.dmg`
 
-            Windows and macOS installers are built on native GitHub-hosted runners. Linux `.deb` and `.AppImage` installers are built on the project's Zorin OS 18.1 host and uploaded separately. Build provenance is not independently verified. Installers are not currently code-signed or notarized.
+            Windows and macOS installers are built on native GitHub-hosted runners. Linux `.deb` and `.AppImage` installers must be built on the project's Zorin OS 18.1 host and added before publication. Each platform build must include matching `BUILD-INFO-*.txt` metadata. Run `scripts/prepare-release-assets.sh` after all five installers and all three metadata files are present to verify a common version/commit and generate `SHA256SUMS.txt`. Build provenance is not independently verified. Installers are not currently code-signed or notarized.
 
             **Integrity**
-            `SHA256SUMS.txt` contains SHA-256 checksums to detect accidental corruption. Checksums are not digital signatures and do not authenticate the publisher.
+            The final `SHA256SUMS.txt` is generated and attached only after Linux installers have been added and all three build metadata files confirm the same Vault commit. Checksums detect accidental corruption; they are not digital signatures and do not authenticate the publisher.
 
             **Known limitations**
             - No independent security audit or production-hardening review.
@@ -157,7 +177,7 @@ jobs:
             - Keep `.nqx` files and folder-vault encrypted objects separately; `.nqb` backups do not contain those payloads.
             - Folder encryption currently has a 32 MiB per-file limit and does not preserve empty directories or symbolic links.
 
-            **Full changelog**: https://github.com/lecodev-26/nexus-q-vault/compare/v0.1.0-alpha.1...v0.1.0
+            **Full changelog**: https://github.com/lecodev-26/nexus-q-vault/blob/main/CHANGELOG.md
           files: release-assets/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

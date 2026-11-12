@@ -1,6 +1,6 @@
 [package]
 name = "nexus-q-vault-desktop"
-version = "0.1.0"
+version = "0.2.0"
 description = "NEXUS-Q Vault cross-platform desktop application"
 edition = "2024"
 rust-version = "1.90"

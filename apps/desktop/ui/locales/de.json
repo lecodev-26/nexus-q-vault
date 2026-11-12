@@ -116,7 +116,6 @@
   "Dark mode": "Dunkler Modus",
   "PREFERENCES": "EINSTELLUNGEN",
   "Settings & profile": "Einstellungen & Profil",
-  "Public release · v0.1.0": "Öffentliche Veröffentlichung · v0.1.0",
   "Local profile": "Lokales Profil",
   "Your profile stays on this device and is not uploaded.": "Ihr Profil bleibt auf diesem Gerät und wird nicht hochgeladen.",
   "Display name": "Anzeigename",
@@ -135,7 +134,6 @@
   "Application": "Anwendung",
   "Build information and important limitations.": "Build-Informationen und wichtige Einschränkungen.",
   "Version": "Versionsnummer",
-  "0.1.0 · Public release": "0.1.0 · Öffentliche Veröffentlichung",
   "Data location": "Datenspeicherort",
   "On this device": "Auf diesem Gerät",
   "Telemetry": "Telemetrie",
@@ -353,5 +351,7 @@
   "Retired": "Stillgelegt",
   "Rotating": "Schlüsselrotation läuft",
   "Share files with a recipient": "Teilen Sie Dateien mit einem Empfänger",
-  "Create a receiving identity, export its public .nqcontact card and verify the full fingerprint with the recipient through a separate trusted channel. Share the .nqx package through any channel. Decryption does not authenticate the sender; keep a separate .nqb backup of your receiving keys.": "Erstellen Sie eine Empfängeridentität, exportieren Sie die öffentliche .nqcontact-Karte und überprüfen Sie den vollständigen Fingerabdruck beim Empfänger über einen separaten vertrauenswürdigen Kanal. Teilen Sie das .nqx-Paket über einen beliebigen Kanal. Durch die Entschlüsselung wird der Absender nicht authentifiziert; Bewahren Sie eine separate .nqb-Sicherung Ihrer Empfangsschlüssel auf."
+  "Create a receiving identity, export its public .nqcontact card and verify the full fingerprint with the recipient through a separate trusted channel. Share the .nqx package through any channel. Decryption does not authenticate the sender; keep a separate .nqb backup of your receiving keys.": "Erstellen Sie eine Empfängeridentität, exportieren Sie die öffentliche .nqcontact-Karte und überprüfen Sie den vollständigen Fingerabdruck beim Empfänger über einen separaten vertrauenswürdigen Kanal. Teilen Sie das .nqx-Paket über einen beliebigen Kanal. Durch die Entschlüsselung wird der Absender nicht authentifiziert; Bewahren Sie eine separate .nqb-Sicherung Ihrer Empfangsschlüssel auf.",
+  "Version · v0.2.0": "Anwendungsversion · v0.2.0",
+  "v0.2.0 · Early access": "v0.2.0 · Früher Zugang"
 }

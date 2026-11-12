@@ -116,7 +116,6 @@
   "Dark mode": "Mode sombre",
   "PREFERENCES": "PRÉFÉRENCES",
   "Settings & profile": "Paramètres et profil",
-  "Public release · v0.1.0": "Version publique · v0.1.0",
   "Local profile": "Profil local",
   "Your profile stays on this device and is not uploaded.": "Votre profil reste sur cet appareil et n’est pas téléversé.",
   "Display name": "Nom d’affichage",
@@ -135,7 +134,6 @@
   "Application": "Logiciel",
   "Build information and important limitations.": "Informations de compilation et limites importantes.",
   "Version": "Numéro de version",
-  "0.1.0 · Public release": "0.1.0 · Version publique",
   "Data location": "Emplacement des données",
   "On this device": "Sur cet appareil",
   "Telemetry": "Télémétrie",
@@ -353,5 +351,7 @@
   "Retired": "Retiré",
   "Rotating": "En rotation",
   "Share files with a recipient": "Partager des fichiers avec un destinataire",
-  "Create a receiving identity, export its public .nqcontact card and verify the full fingerprint with the recipient through a separate trusted channel. Share the .nqx package through any channel. Decryption does not authenticate the sender; keep a separate .nqb backup of your receiving keys.": "Créez une identité de réception, exportez sa fiche publique .nqcontact et vérifiez l’empreinte complète avec le destinataire par un autre canal de confiance. Partagez le paquet .nqx par le canal de votre choix. Le déchiffrement n’authentifie pas l’expéditeur ; conservez une sauvegarde .nqb distincte de vos clés de réception."
+  "Create a receiving identity, export its public .nqcontact card and verify the full fingerprint with the recipient through a separate trusted channel. Share the .nqx package through any channel. Decryption does not authenticate the sender; keep a separate .nqb backup of your receiving keys.": "Créez une identité de réception, exportez sa fiche publique .nqcontact et vérifiez l’empreinte complète avec le destinataire par un autre canal de confiance. Partagez le paquet .nqx par le canal de votre choix. Le déchiffrement n’authentifie pas l’expéditeur ; conservez une sauvegarde .nqb distincte de vos clés de réception.",
+  "Version · v0.2.0": "Version de l’application · v0.2.0",
+  "v0.2.0 · Early access": "v0.2.0 · Accès anticipé"
 }
