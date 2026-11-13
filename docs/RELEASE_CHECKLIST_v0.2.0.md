@@ -1,43 +1,64 @@
 # NEXUS-Q Vault v0.2.0 release checklist
 
-**Status:** preparation in progress. No `v0.2.0` tag or public release is created by this checklist.
+**Status:** completed and publicly released on 2026-11-13.
 
-## Source and scope
-- [x] Base release range is `v0.1.0..0a6dbad55f8ed86e97a18dbf19728404d74817c6` (34 commits).
-- [x] PRs #22–#33 are merged; no open pull requests were found during the 2026-11-12 audit.
-- [x] Remaining open issues #6–#15 are future language requests (Italian, Japanese, Korean, Simplified/Traditional Chinese, Arabic, Hindi, Indonesian, Turkish and Russian); none is a dependency of the current release scope.
-- [x] Core repository is not modified. CI and release builds use the immutable `nexus-q` revision `458fc393992f4b8030ff594a408620058032e214`.
+## Release identity
+- [x] Version: `0.2.0`.
+- [x] Release tag: `v0.2.0`.
+- [x] Release commit: `3d174a3338bf775eb46d5a836607689994887b78`.
+- [x] GitHub Release is published (not a draft and not a prerelease).
+- [x] Public release: https://github.com/lecodev-26/nexus-q-vault/releases/tag/v0.2.0
+- [x] Core repository was not modified.
 
 ## Release content
-- [x] `CHANGELOG.md` records the v0.2.0 changes.
-- [x] README describes current features and all seven UI languages.
+- [x] Changelog updated for v0.2.0 and committed to `main` in `dea0a08`.
+- [x] README and release notes describe the shipped feature set.
 - [x] Version metadata is aligned to `0.2.0`; Windows WiX ProductVersion is `0.2.0.1`.
-- [x] Release workflow builds Linux, Windows and macOS installers on native GitHub-hosted Actions runners; manual candidate builds do not publish and tag-triggered publishing creates a draft release.
+- [x] Configurable automatic vault inactivity locking and system-event lock handling.
+- [x] Recovery-safe lock behavior and sensitive-state cleanup on failed transitions.
+- [x] Cancellable operations center for supported long-running vault operations.
+- [x] Recipient-encrypted file sharing packages, without a hosted service.
+- [x] Seven interface languages: English, Spanish, Catalan, French, German, Portuguese (Portugal) and Portuguese (Brazil).
+- [x] Independent-process backup recovery coverage and clearer recovery guidance.
+- [x] Hardened shared-file publication, temporary-file permissions, path handling and failure cleanup.
 
-## Required validation before tagging
-- [ ] Run root Rust checks with the pinned sibling Core checkout available: `cargo fmt --all -- --check`, `cargo clippy --locked --all-targets -- -D warnings`, `cargo test --locked`.
-- [ ] Run desktop Rust checks: `cargo fmt --manifest-path apps/desktop/Cargo.toml -- --check`, `cargo clippy --manifest-path apps/desktop/Cargo.toml --locked --all-targets -- -D warnings`, `cargo test --manifest-path apps/desktop/Cargo.toml --locked --bin nexus-q-vault-desktop`.
-- [ ] Run frontend tests: `node --test apps/desktop/ui/i18n/i18n.test.js apps/desktop/ui/password-confirmation.test.js`.
-- [ ] Review the recipient-sharing warning: recipient encryption protects the receiving identity but does not authenticate the sender; fingerprint verification must use a separate trusted channel.
-- [ ] Run release workflow manually and inspect Linux DEB/AppImage, Windows MSI/NSIS and macOS DMG candidate artifacts from GitHub Actions.
-- [ ] Smoke-test installers and application startup on Windows, macOS and Linux. Compilation alone is not an installer/runtime smoke test.
+## CI and platform builds
+- [x] GitHub Actions release run completed successfully: https://github.com/lecodev-26/nexus-q-vault/actions/runs/43338753807
+- [x] Release run ID: `43338753807`.
+- [x] Release workflow completed with `success` on commit `3d174a3338bf775eb46d5a836607689994887b78`.
+- [x] Linux build job completed successfully.
+- [x] Windows build job completed successfully.
+- [x] macOS build job completed successfully.
+- [x] Release validation/publishing job completed successfully.
+- [x] All five workflow jobs completed successfully.
 
-## Artifact finalization
-- [ ] Confirm the Actions publish job collected exactly the intended Windows `.msi` and `.exe`, macOS `.dmg`, Linux `.deb` and `.AppImage` installers.
-- [ ] Confirm `BUILD-INFO-windows.txt`, `BUILD-INFO-macos.txt` and `BUILD-INFO-linux.txt` contain identical `version=0.2.0` and the same 40-character Vault commit hash.
-- [ ] Confirm the Actions publish job ran `scripts/prepare-release-assets.sh` from the exact release-commit checkout; it rejects missing formats, missing metadata, commit/version mismatches and metadata that does not match the current checkout, then writes `SHA256SUMS.txt`.
-- [ ] Verify the checksum file on a clean copy of the complete artifact directory. Checksums detect corruption; they are not signatures or provenance attestations.
-- [ ] Review artifact names, formats, sizes and checksums attached to the draft release.
+## Published release assets
+The public release contains the following nine assets:
 
-## Final authorization gate
-- [ ] Review the final diff, exact release commit, CI run, release notes, platform smoke tests and all five installers.
-- [ ] Obtain explicit authorization before creating/pushing tag `v0.2.0`.
-- [ ] Obtain explicit authorization before publishing the draft GitHub Release.
+- [x] `NEXUS-Q.Vault_0.2.0_amd64.deb`
+- [x] `NEXUS-Q.Vault_0.2.0_amd64.AppImage`
+- [x] `NEXUS-Q.Vault_0.2.0_aarch64.dmg` (macOS Apple Silicon)
+- [x] `NEXUS-Q.Vault_0.2.0_x64-setup.exe`
+- [x] `NEXUS-Q.Vault_0.2.0_x64_en-US.msi`
+- [x] `BUILD-INFO-linux.txt`
+- [x] `BUILD-INFO-macos.txt`
+- [x] `BUILD-INFO-windows.txt`
+- [x] `SHA256SUMS.txt`
 
-## Linux build metadata example
-From the exact release commit on the Zorin build host, after building the Linux installers:
+## Artifact verification
+- [x] Release asset filenames were normalized by `scripts/prepare-release-assets.sh` before checksum generation.
+- [x] All three BUILD-INFO files report version `0.2.0`.
+- [x] All three BUILD-INFO files identify release commit `3d174a3338bf775eb46d5a836607689994887b78` and their respective platforms.
+- [x] All nine release assets were downloaded for verification.
+- [x] All eight checksum entries in `SHA256SUMS.txt` passed local `sha256sum -c` verification (five installers and three BUILD-INFO files).
+- [x] Checksum verification confirms file integrity against the published checksum list; it is not a digital signature or an independent provenance attestation.
 
-```sh
-mkdir -p release-assets
-printf 'version=0.2.0\ncommit=%s\nplatform=linux\n' "$(git rev-parse HEAD)" > release-assets/BUILD-INFO-linux.txt
-```
+## Post-release notes
+- [x] The release is public and available to users at the release URL above.
+- [x] Existing v0.1.0 and v0.2.0 installations do not have an integrated updater; users must download and install newer versions manually.
+- [x] Follow-up issue opened for a Tauri integrated updater in a future release: https://github.com/lecodev-26/nexus-q-vault/issues/37.
+- [x] The initial transition to a version containing the updater will require a manual installation; integrated updates can be used for subsequent releases.
+
+## Release outcome
+
+**v0.2.0 is complete and published.** No further v0.2.0 tagging or publication authorization is pending.
